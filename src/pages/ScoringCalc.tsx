@@ -42,7 +42,7 @@ function calcScore(s: Stats): ScoreLine[] {
 function NumInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gold/10 last:border-0">
-      <label className="text-[#52526A] text-xs font-sans">{label}</label>
+      <label className="text-muted text-xs font-sans">{label}</label>
       <input
         type="number"
         value={value}
@@ -69,7 +69,7 @@ export default function ScoringCalc() {
 
       <div className="mb-8">
         <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Scoring Calculator</h1>
-        <p className="text-[#52526A] text-sm font-sans">
+        <p className="text-muted text-sm font-sans">
           Enter any stat line to see the exact SDFF point total, including all bonus stacking.
         </p>
       </div>
@@ -79,7 +79,7 @@ export default function ScoringCalc() {
         <Card>
           {/* Position selector */}
           <div className="mb-4">
-            <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-2">Position</div>
+            <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Position</div>
             <div className="flex gap-2">
               {(['QB', 'RB', 'WR', 'TE'] as const).map((pos) => (
                 <button
@@ -88,7 +88,7 @@ export default function ScoringCalc() {
                   className={`font-mono text-xs px-3 py-1.5 border rounded transition-all ${
                     stats.position === pos
                       ? 'border-gold bg-gold/10 text-gold font-semibold'
-                      : 'border-gold/20 text-[#52526A] hover:border-gold/40 hover:text-[#F6F0E2]'
+                      : 'border-gold/20 text-muted hover:border-gold/40 hover:text-[#F6F0E2]'
                   }`}
                 >
                   {pos}
@@ -130,7 +130,7 @@ export default function ScoringCalc() {
                   onChange={(e) => set(key as keyof Stats, e.target.checked as Stats[keyof Stats])}
                   className="w-4 h-4 accent-gold"
                 />
-                <span className="text-[#52526A] text-xs font-sans group-hover:text-[#C8C4B8] transition-colors">
+                <span className="text-muted text-xs font-sans group-hover:text-[#C8C4B8] transition-colors">
                   {label}
                 </span>
               </label>
@@ -141,24 +141,24 @@ export default function ScoringCalc() {
         {/* Output */}
         <div className="flex flex-col gap-4">
           <Card className="py-6 text-center">
-            <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-3">Total Score</div>
+            <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-3">Total Score</div>
             <div className={`font-mono font-bold leading-none mb-2 ${
-              total === 0 ? 'text-[#52526A] text-5xl' :
+              total === 0 ? 'text-muted text-5xl' :
               total < 0  ? 'text-red-400 text-5xl' :
                            'text-[#F6F0E2] text-6xl'
             }`}>
               {total.toFixed(2)}
             </div>
-            <div className="text-[#52526A] text-xs font-sans">fantasy points</div>
+            <div className="text-muted text-xs font-sans">fantasy points</div>
           </Card>
 
           {lines.length > 0 && (
             <Card>
-              <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-3">Breakdown</div>
+              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-3">Breakdown</div>
               <div>
                 {lines.map((line) => (
                   <div key={line.label} className="flex justify-between items-center py-2 border-b border-gold/10 last:border-0">
-                    <span className="text-[#52526A] text-xs font-sans">{line.label}</span>
+                    <span className="text-muted text-xs font-sans">{line.label}</span>
                     <span className={`font-mono text-sm tabular-nums ${line.value >= 0 ? 'text-[#F6F0E2]' : 'text-red-400'}`}>
                       {line.value >= 0 ? '+' : ''}{line.value.toFixed(2)}
                     </span>
@@ -177,7 +177,7 @@ export default function ScoringCalc() {
 
           {lines.length === 0 && (
             <div className="bg-surface border border-gold/10 rounded p-6 text-center">
-              <p className="text-[#52526A] text-sm font-sans">Enter stats on the left to see your score.</p>
+              <p className="text-muted text-sm font-sans">Enter stats on the left to see your score.</p>
             </div>
           )}
         </div>

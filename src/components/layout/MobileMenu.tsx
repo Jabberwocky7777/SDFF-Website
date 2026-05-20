@@ -12,7 +12,7 @@ export default function MobileMenu({ links, open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 bg-background/98 flex flex-col" onClick={onClose}>
       <div className="flex justify-end p-4">
-        <button className="text-[#52526A] hover:text-gold p-2" aria-label="Close menu">
+        <button className="text-muted hover:text-gold p-2" aria-label="Close menu">
           <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="4" y1="4" x2="18" y2="18" />
             <line x1="18" y1="4" x2="4" y2="18" />

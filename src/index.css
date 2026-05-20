@@ -4,7 +4,7 @@
 
 @layer base {
   html {
-    background-color: #0B0D1A;
+    background-color: #111214;
     color: #F6F0E2;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -24,7 +24,7 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0B0D1A;
+    background: #111214;
   }
   ::-webkit-scrollbar-thumb {
     background: rgba(196, 149, 42, 0.3);

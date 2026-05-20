@@ -23,7 +23,7 @@ function AccordionItem({ question, answer }: { question: string; answer: string 
         </span>
       </button>
       {open && (
-        <div className="pb-4 pr-8 text-[#52526A] text-sm font-sans leading-relaxed">
+        <div className="pb-4 pr-8 text-muted text-sm font-sans leading-relaxed">
           {answer}
         </div>
       )}
@@ -36,7 +36,7 @@ export default function Bylaws() {
     <div>
       <div className="mb-8">
         <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Rules & FAQs</h1>
-        <p className="text-[#52526A] text-sm font-sans">
+        <p className="text-muted text-sm font-sans">
           Common questions about SDFF scoring, roster rules, trading, and more.
         </p>
       </div>
@@ -45,7 +45,7 @@ export default function Bylaws() {
       <div className="flex items-center justify-between px-4 py-3 bg-surface border border-gold/25 rounded mb-8">
         <div>
           <div className="text-[#F6F0E2] text-sm font-sans font-medium">Scoring Calculator</div>
-          <div className="text-[#52526A] text-xs font-sans mt-0.5">
+          <div className="text-muted text-xs font-sans mt-0.5">
             Enter a stat line to see exact SDFF points with a full breakdown.
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function Bylaws() {
       </div>
 
       <GoldRule className="mt-10 mb-4" />
-      <p className="text-[#52526A] text-xs font-sans">
+      <p className="text-muted text-xs font-sans">
         These FAQs reflect the SDFF bylaws as ratified before the 2026 season.
         Rule changes require a 7/12 vote during the April 1 → Rookie Draft window.
       </p>

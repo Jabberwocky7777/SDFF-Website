@@ -12,11 +12,11 @@ export default function RootLayout() {
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="" className="h-6 w-6 opacity-50" />
-            <span className="font-sans text-[#52526A] text-xs uppercase tracking-widest">
+            <span className="font-sans text-muted text-xs uppercase tracking-widest">
               Squad Dynasty FF
             </span>
           </div>
-          <div className="text-[#52526A] text-[10px] font-mono tracking-widest">
+          <div className="text-muted text-[10px] font-mono tracking-widest">
             · · · EST. 2026 · · ·
           </div>
         </div>

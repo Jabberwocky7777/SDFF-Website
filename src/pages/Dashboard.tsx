@@ -1,9 +1,11 @@
+import { Link } from 'react-router-dom'
 import SectionHeader from '@/components/ui/SectionHeader'
 import Card from '@/components/ui/Card'
 import GoldRule from '@/components/ui/GoldRule'
 import { useNflState } from '@/hooks/useNflState'
 import { useRosters } from '@/hooks/useRosters'
 import { useUsers } from '@/hooks/useUsers'
+import { useAnnouncements } from '@/hooks/useAnnouncements'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import DotDivider from '@/components/ui/DotDivider'
 
@@ -14,16 +16,20 @@ const STATUS_LABEL: Record<string, string> = {
   post: 'Playoffs',
 }
 
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
 function PreDraftBanner() {
   return (
     <div className="relative overflow-hidden rounded border border-gold/25 bg-surface mb-10">
-      {/* Corner brackets */}
       <span className="absolute top-2 left-3 text-gold/30 text-xs font-mono">┌</span>
       <span className="absolute top-2 right-3 text-gold/30 text-xs font-mono">┐</span>
       <span className="absolute bottom-2 left-3 text-gold/30 text-xs font-mono">└</span>
       <span className="absolute bottom-2 right-3 text-gold/30 text-xs font-mono">┘</span>
 
-      {/* Subtle radial glow behind logo */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-64 h-64 rounded-full bg-gold/5 blur-3xl" />
       </div>
@@ -33,13 +39,56 @@ function PreDraftBanner() {
         <h1 className="font-serif text-[#F6F0E2] text-3xl font-bold tracking-wide mb-3">
           Awaiting Draft
         </h1>
-        <p className="text-[#52526A] text-sm font-sans max-w-sm leading-relaxed">
+        <p className="text-muted text-sm font-sans max-w-sm leading-relaxed">
           The 2026 season hasn't kicked off yet. Rosters and matchup data will populate after the startup draft.
         </p>
         <DotDivider className="my-6 w-24" />
-        <span className="font-sans text-[#52526A] text-[10px] uppercase tracking-[0.3em]">Est. 2026</span>
+        <span className="font-sans text-muted text-[10px] uppercase tracking-[0.3em]">Est. 2026</span>
       </div>
     </div>
+  )
+}
+
+function AnnouncementsWidget() {
+  const { data: announcements } = useAnnouncements()
+
+  if (!announcements || announcements.length === 0) return null
+
+  const recent = announcements.slice(0, 2)
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <SectionHeader className="mb-0">Latest News</SectionHeader>
+        <Link
+          to="/announcements"
+          className="text-muted hover:text-gold text-[10px] font-mono uppercase tracking-widest transition-colors"
+        >
+          View all →
+        </Link>
+      </div>
+      <div className="space-y-3 mb-10">
+        {recent.map((a) => (
+          <div
+            key={a.id}
+            className={`bg-surface border rounded p-4 ${a.pinned ? 'border-gold/35' : 'border-gold/15'}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  {a.pinned && (
+                    <span className="text-[9px] font-sans text-gold uppercase tracking-wider shrink-0">📌</span>
+                  )}
+                  <h3 className="font-serif text-[#F6F0E2] text-sm font-semibold truncate">{a.title}</h3>
+                </div>
+                <p className="text-muted text-[10px] font-mono mb-2">{formatDate(a.createdAt)}</p>
+                <p className="text-muted text-xs font-sans leading-relaxed line-clamp-2">{a.body}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -65,12 +114,15 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* Announcements widget — always shown above the fold if there's content */}
+      <AnnouncementsWidget />
+
       {isPreDraft ? (
         <PreDraftBanner />
       ) : (
         <>
           <SectionHeader>Week {nflState?.week} Matchups</SectionHeader>
-          <p className="text-[#52526A] text-sm mb-8">Matchup board coming soon.</p>
+          <p className="text-muted text-sm mb-8">Matchup board coming soon.</p>
         </>
       )}
 
@@ -79,15 +131,15 @@ export default function Dashboard() {
           <SectionHeader>League at a Glance</SectionHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
             <Card className="py-5">
-              <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-2">Teams</div>
+              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Teams</div>
               <div className="font-mono text-3xl text-[#F6F0E2] font-bold">{rosters.length}</div>
             </Card>
             <Card className="py-5">
-              <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-2">Season</div>
+              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Season</div>
               <div className="font-mono text-3xl text-[#F6F0E2] font-bold">2026</div>
             </Card>
             <Card className="py-5">
-              <div className="text-[#52526A] text-[10px] uppercase tracking-widest font-sans mb-2">Status</div>
+              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Status</div>
               <div className="font-mono text-lg text-gold font-semibold">{statusLabel}</div>
             </Card>
           </div>
@@ -117,7 +169,7 @@ export default function Dashboard() {
                         {user.metadata?.team_name || user.display_name}
                       </div>
                       {user.metadata?.team_name && (
-                        <div className="text-[#52526A] text-[10px] font-sans truncate">{user.display_name}</div>
+                        <div className="text-muted text-[10px] font-sans truncate">{user.display_name}</div>
                       )}
                     </div>
                   </div>

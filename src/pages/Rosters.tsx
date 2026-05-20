@@ -37,7 +37,7 @@ export default function Rosters() {
     <div>
       <div className="mb-8">
         <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Rosters</h1>
-        <p className="text-[#52526A] text-sm font-sans">
+        <p className="text-muted text-sm font-sans">
           {playersLoading
             ? 'Loading player data…'
             : 'Click any team to see their full roster with age tiers and taxi squad.'}
@@ -58,7 +58,7 @@ export default function Rosters() {
                     <div className="font-serif text-[#F6F0E2] font-semibold text-sm leading-tight truncate">
                       {roster.teamName}
                     </div>
-                    <div className="text-[#52526A] text-xs font-sans mt-0.5">
+                    <div className="text-muted text-xs font-sans mt-0.5">
                       {hasPlayers
                         ? `${roster.starters.length + roster.bench.length} players${roster.taxi.length ? ` · ${roster.taxi.length} taxi` : ''}`
                         : 'No players yet'}
@@ -77,19 +77,19 @@ export default function Rosters() {
                       </div>
                     ))}
                     {roster.starters.length > 5 && (
-                      <div className="text-[#52526A] text-xs pl-9">
+                      <div className="text-muted text-xs pl-9">
                         +{roster.starters.length - 5 + roster.bench.length} more
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[#52526A] text-xs font-sans italic">
+                  <p className="text-muted text-xs font-sans italic">
                     Roster populates after the draft.
                   </p>
                 )}
 
                 {taxiLocked && roster.taxi.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-gold/10 text-[10px] text-[#52526A] font-sans">
+                  <div className="mt-3 pt-2 border-t border-gold/10 text-[10px] text-muted font-sans">
                     🔒 Taxi locked for season
                   </div>
                 )}

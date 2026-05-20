@@ -4,9 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#0B0D1A',
-        surface: '#13162A',
+        background: '#111214',
+        surface: '#1A1C22',
         gold: '#C4952A',
+        muted: '#9090AE',
       },
       fontFamily: {
         serif: ['"Playfair Display"', 'Georgia', 'serif'],

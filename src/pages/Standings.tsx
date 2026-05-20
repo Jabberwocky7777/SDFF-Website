@@ -33,7 +33,7 @@ export default function Standings() {
     <div>
       <div className="mb-8">
         <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Standings</h1>
-        <p className="text-[#52526A] text-sm font-sans">
+        <p className="text-muted text-sm font-sans">
           Overall record = H2H wins + median wins. Seed 6 goes to the highest scorer outside the top 5.
         </p>
       </div>
@@ -41,13 +41,13 @@ export default function Standings() {
       <div className="bg-surface border border-gold/20 overflow-hidden rounded">
         {/* Table header */}
         <div className="grid grid-cols-[2rem_1fr_5rem_4rem_4rem_5rem_5rem] gap-0 border-b border-gold/20 px-4 py-3">
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans">#</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans">Team</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans text-center">Overall</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans text-center hidden sm:block">H2H</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans text-center hidden sm:block">Med</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans text-center">PF</div>
-          <div className="text-[#52526A] text-[10px] uppercase tracking-wider font-sans text-center">MPF</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans">#</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans">Team</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans text-center">Overall</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans text-center hidden sm:block">H2H</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans text-center hidden sm:block">Med</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans text-center">PF</div>
+          <div className="text-muted text-[10px] uppercase tracking-wider font-sans text-center">MPF</div>
         </div>
 
         {standings.map((team, i) => {
@@ -65,7 +65,7 @@ export default function Standings() {
               {/* Seed */}
               <div className="flex items-center">
                 <span className={`font-mono text-sm font-bold ${
-                  inPlayoffs ? 'text-gold' : 'text-[#52526A]'
+                  inPlayoffs ? 'text-gold' : 'text-muted'
                 }`}>
                   {team.seed != null ? (
                     isSeed6 ? '6*' : team.seed
@@ -90,21 +90,21 @@ export default function Standings() {
 
               {/* Overall */}
               <div className="flex items-center justify-center">
-                <span className={`font-mono text-sm ${inPlayoffs ? 'text-[#F6F0E2]' : 'text-[#52526A]'}`}>
+                <span className={`font-mono text-sm ${inPlayoffs ? 'text-[#F6F0E2]' : 'text-muted'}`}>
                   {fmtRecord(team.totalWins, team.totalLosses)}
                 </span>
               </div>
 
               {/* H2H */}
               <div className="items-center justify-center hidden sm:flex">
-                <span className="font-mono text-xs text-[#52526A]">
+                <span className="font-mono text-xs text-muted">
                   {fmtRecord(team.h2hWins, team.h2hLosses)}
                 </span>
               </div>
 
               {/* Median */}
               <div className="items-center justify-center hidden sm:flex">
-                <span className="font-mono text-xs text-[#52526A]">
+                <span className="font-mono text-xs text-muted">
                   {fmtRecord(team.medianWins, team.medianLosses)}
                 </span>
               </div>
@@ -112,14 +112,14 @@ export default function Standings() {
               {/* PF */}
               <div className="flex items-center justify-center">
                 <span className="font-mono text-sm text-[#F6F0E2]">
-                  {team.pf > 0 ? fmtPts(team.pf) : <span className="text-[#52526A]">—</span>}
+                  {team.pf > 0 ? fmtPts(team.pf) : <span className="text-muted">—</span>}
                 </span>
               </div>
 
               {/* MPF */}
               <div className="flex items-center justify-center">
                 <span className="font-mono text-sm text-gold/70">
-                  {team.mpf > 0 ? fmtPts(team.mpf) : <span className="text-[#52526A]">—</span>}
+                  {team.mpf > 0 ? fmtPts(team.mpf) : <span className="text-muted">—</span>}
                 </span>
               </div>
             </div>
@@ -128,7 +128,7 @@ export default function Standings() {
       </div>
 
       <GoldRule className="mt-6 mb-4" />
-      <div className="flex flex-wrap gap-x-6 gap-y-1 text-[#52526A] text-xs font-sans">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-muted text-xs font-sans">
         <span><span className="text-gold font-mono">*</span> Seed 6 = highest PF outside seeds 1–5</span>
         <span>MPF = Max Points For — determines rookie draft order (reverse MPF, picks 1–9)</span>
         <span>Overall = H2H record + weekly median wins</span>

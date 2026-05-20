@@ -8,6 +8,7 @@ const links = [
   { to: '/rosters', label: 'Rosters' },
   { to: '/timeline', label: 'Timeline' },
   { to: '/bylaws', label: 'Bylaws' },
+  { to: '/announcements', label: 'News' },
 ]
 
 export default function NavBar() {
@@ -41,7 +42,7 @@ export default function NavBar() {
                   `px-3 py-1.5 text-xs font-sans uppercase tracking-wider rounded transition-all duration-150 ${
                     isActive
                       ? 'text-gold border border-gold/40 bg-gold/8'
-                      : 'text-[#52526A] hover:text-[#F6F0E2] hover:bg-white/5'
+                      : 'text-muted hover:text-[#F6F0E2] hover:bg-white/5'
                   }`
                 }
               >
@@ -52,7 +53,7 @@ export default function NavBar() {
 
           {/* Mobile hamburger */}
           <button
-            className="sm:hidden text-[#52526A] hover:text-gold p-2 transition-colors"
+            className="sm:hidden text-muted hover:text-gold p-2 transition-colors"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
           >

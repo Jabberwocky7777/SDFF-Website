@@ -5,7 +5,7 @@ const TYPE_STYLES: Record<string, { badge: string; dot: string }> = {
   draft:    { badge: 'bg-gold/20 text-gold border border-gold/40',            dot: 'bg-gold' },
   deadline: { badge: 'bg-red-500/15 text-red-400 border border-red-500/30',   dot: 'bg-red-400' },
   playoffs: { badge: 'bg-blue-500/15 text-blue-300 border border-blue-500/30', dot: 'bg-blue-400' },
-  offseason:{ badge: 'bg-surface border border-gold/15 text-[#52526A]',        dot: 'bg-[#52526A]' },
+  offseason:{ badge: 'bg-surface border border-gold/15 text-muted',        dot: 'bg-muted' },
   waiver:   { badge: 'bg-green-500/15 text-green-400 border border-green-500/30', dot: 'bg-green-400' },
   season:   { badge: 'bg-surface border border-gold/30 text-gold/80',          dot: 'bg-gold/60' },
 }
@@ -28,7 +28,7 @@ export default function Timeline() {
     <div>
       <div className="mb-8">
         <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">League Calendar</h1>
-        <p className="text-[#52526A] text-sm font-sans">Key dates for the SDFF 2026 season.</p>
+        <p className="text-muted text-sm font-sans">Key dates for the SDFF 2026 season.</p>
       </div>
 
       <div className="relative pl-0 sm:pl-36">
@@ -46,7 +46,7 @@ export default function Timeline() {
 
                 {/* Date label — absolutely positioned left of the line on sm+ */}
                 <div className="hidden sm:block absolute right-[calc(100%+1.75rem)] top-3.5 w-28 text-right">
-                  <span className="font-mono text-[11px] text-[#52526A] leading-none whitespace-nowrap">
+                  <span className="font-mono text-[11px] text-muted leading-none whitespace-nowrap">
                     {formatDate(event.date)}
                   </span>
                 </div>
@@ -61,7 +61,7 @@ export default function Timeline() {
                 </div>
 
                 {/* Mobile date */}
-                <div className="sm:hidden font-mono text-[11px] text-[#52526A]">
+                <div className="sm:hidden font-mono text-[11px] text-muted">
                   {formatDate(event.date)}
                 </div>
 
@@ -70,7 +70,7 @@ export default function Timeline() {
                   isNext ? 'border-gold/50 shadow-[0_0_16px_rgba(196,149,42,0.08)]' : 'border-gold/15'
                 }`}>
                   <div className="flex items-start gap-2 flex-wrap">
-                    <span className={`font-serif text-sm font-semibold leading-snug ${past ? 'text-[#52526A]' : 'text-[#F6F0E2]'}`}>
+                    <span className={`font-serif text-sm font-semibold leading-snug ${past ? 'text-muted' : 'text-[#F6F0E2]'}`}>
                       {event.label}
                     </span>
                     <span className={`text-[9px] font-sans px-1.5 py-0.5 rounded-sm uppercase tracking-wider shrink-0 ${styles.badge}`}>
@@ -83,7 +83,7 @@ export default function Timeline() {
                     )}
                   </div>
                   {event.description && (
-                    <p className="text-[#52526A] text-xs font-sans leading-relaxed mt-1.5">
+                    <p className="text-muted text-xs font-sans leading-relaxed mt-1.5">
                       {event.description}
                     </p>
                   )}
@@ -95,7 +95,7 @@ export default function Timeline() {
       </div>
 
       <GoldRule className="mt-10 mb-4" />
-      <p className="text-[#52526A] text-xs font-sans">
+      <p className="text-muted text-xs font-sans">
         Rookie draft is scheduled one week after the NFL Draft concludes. Future season dates confirmed annually.
       </p>
     </div>

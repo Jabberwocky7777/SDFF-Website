@@ -18,12 +18,12 @@ const POSITION_COLOR: Record<string, string> = {
   RB: 'text-green-400',
   WR: 'text-blue-400',
   TE: 'text-yellow-400',
-  K: 'text-[#52526A]',
-  DEF: 'text-[#52526A]',
+  K: 'text-muted',
+  DEF: 'text-muted',
 }
 
 function PlayerRow({ player }: { player: EnrichedPlayer }) {
-  const posColor = POSITION_COLOR[player.position] ?? 'text-[#52526A]'
+  const posColor = POSITION_COLOR[player.position] ?? 'text-muted'
   return (
     <div className="flex items-center gap-3 py-2 border-b border-gold/10 last:border-0">
       <span className={`font-mono text-xs w-8 shrink-0 font-semibold ${posColor}`}>
@@ -32,10 +32,10 @@ function PlayerRow({ player }: { player: EnrichedPlayer }) {
       <span className="text-[#F6F0E2] text-sm flex-1 truncate">{player.fullName}</span>
       <div className="flex items-center gap-2 shrink-0">
         {player.nflTeam && (
-          <span className="text-[#52526A] text-xs font-mono">{player.nflTeam}</span>
+          <span className="text-muted text-xs font-mono">{player.nflTeam}</span>
         )}
         {player.age != null && (
-          <span className="text-[#52526A] text-xs font-mono">Age {player.age}</span>
+          <span className="text-muted text-xs font-mono">Age {player.age}</span>
         )}
         <AgeTierBadge tier={player.ageTier} />
         {player.injuryStatus && (
@@ -68,7 +68,7 @@ export default function TeamDetail() {
   )
 
   if (!roster) return (
-    <div className="text-[#52526A] text-sm">Team not found.</div>
+    <div className="text-muted text-sm">Team not found.</div>
   )
 
   return (
@@ -81,7 +81,7 @@ export default function TeamDetail() {
         <ShieldAvatar avatarUrl={roster.avatarUrl} teamName={roster.teamName} size={56} />
         <div>
           <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold leading-tight">{roster.teamName}</h1>
-          <div className="text-[#52526A] text-xs font-sans mt-1.5 flex items-center gap-4">
+          <div className="text-muted text-xs font-sans mt-1.5 flex items-center gap-4">
             <span>FAAB: <span className="text-gold font-mono font-semibold">${roster.faabRemaining}</span></span>
             <span>{roster.starters.length} starters · {roster.bench.length} bench{roster.taxi.length ? ` · ${roster.taxi.length} taxi` : ''}{roster.ir.length ? ` · ${roster.ir.length} IR` : ''}</span>
           </div>
@@ -91,7 +91,7 @@ export default function TeamDetail() {
       <Card className="mb-6">
         <SectionHeader>Starters</SectionHeader>
         {roster.starters.length === 0 ? (
-          <p className="text-[#52526A] text-sm">No starters set.</p>
+          <p className="text-muted text-sm">No starters set.</p>
         ) : (
           roster.starters.map((p) => <PlayerRow key={p.playerId} player={p} />)
         )}
@@ -117,7 +117,7 @@ export default function TeamDetail() {
                 <span className="text-[10px] text-gold/50 font-sans">🔒 Locked for season</span>
               )}
             </div>
-            <p className="text-[#52526A] text-xs font-sans mb-3">
+            <p className="text-muted text-xs font-sans mb-3">
               Only original drafting manager may taxi. Eligible up to 2 years if not activated.
             </p>
             {roster.taxi.map((p) => <PlayerRow key={p.playerId} player={p} />)}
@@ -135,7 +135,7 @@ export default function TeamDetail() {
         </>
       )}
 
-      <div className="mt-6 text-[#52526A] text-xs font-sans">
+      <div className="mt-6 text-muted text-xs font-sans">
         <span className="text-green-400">●</span> Prime &nbsp;
         <span className="text-yellow-400">●</span> Ascending &nbsp;
         <span className="text-red-400">●</span> Declining

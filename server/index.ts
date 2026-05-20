@@ -3,6 +3,7 @@ import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sleeperRouter from './routes/sleeper.js'
+import announcementsRouter from './routes/announcements.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -15,17 +16,33 @@ for (const key of REQUIRED_ENV) {
   }
 }
 
+if (!process.env.ADMIN_PASSWORD) {
+  console.warn('[startup] ADMIN_PASSWORD not set — announcements admin endpoint will be disabled')
+}
+
 const app = express()
 const PORT = Number(process.env.SERVER_PORT ?? 3001)
 const SITE_PASSWORD = process.env.SITE_PASSWORD as string
 const IS_DEV = process.env.NODE_ENV !== 'production'
 
-// Health check — no auth required so Docker/TrueNAS can probe the container
+// Health check — no auth required
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
-// HTTP Basic Auth — protects all routes below
+// Static files and SPA fallback — served without auth so React can load
+const distPath = path.join(__dirname, '..', 'dist')
+app.use(express.static(distPath))
+app.get('/{*splat}', (_req, res, next) => {
+  // Only serve index.html for non-API routes
+  if (_req.path.startsWith('/api/')) return next()
+  res.sendFile(path.join(distPath, 'index.html'))
+})
+
+// JSON body parsing for API routes
+app.use(express.json())
+
+// HTTP Basic Auth — protects all /api/* routes below
 app.use((req, res, next) => {
   const authHeader = req.headers.authorization
 
@@ -40,8 +57,8 @@ app.use((req, res, next) => {
     }
   }
 
-  res.setHeader('WWW-Authenticate', 'Basic realm="SDFF"')
-  res.status(401).send('Unauthorized')
+  // Return JSON 401 — no WWW-Authenticate header so browser dialog never appears
+  res.status(401).json({ error: 'unauthorized' })
 })
 
 // Security headers
@@ -56,17 +73,16 @@ if (IS_DEV) {
   app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 }
 
+// Auth check endpoint — lightweight, just validates credentials
+app.get('/api/me', (_req, res) => {
+  res.json({ ok: true })
+})
+
 // Sleeper API proxy with caching
 app.use('/api', sleeperRouter)
 
-// Static files (production build)
-const distPath = path.join(__dirname, '..', 'dist')
-app.use(express.static(distPath))
-
-// SPA fallback — Express 5 requires named wildcard
-app.get('/{*splat}', (_req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+// Announcements
+app.use('/api', announcementsRouter)
 
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)
