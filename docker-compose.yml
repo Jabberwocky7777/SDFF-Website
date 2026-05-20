@@ -2,7 +2,7 @@ services:
   sdff-web:
     image: ghcr.io/jabberwocky7777/sdff-website:latest
     ports:
-      - "3001:3001"
+      - "7780:7780"
     volumes:
       - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path
     env_file:
