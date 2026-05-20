@@ -1,0 +1,16 @@
+services:
+  sdff-web:
+    image: ghcr.io/jabberwocky7777/sdff-website:latest
+    ports:
+      - "3001:3001"
+    volumes:
+      - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
