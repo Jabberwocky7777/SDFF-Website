@@ -16,18 +16,14 @@ export default function NavBar() {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-sm border-b border-gold/20 h-16">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-sm border-b border-borderLow h-[72px]">
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
 
           <Link to="/" className="flex items-center gap-3 shrink-0">
             <img src="/logo.svg" alt="SDFF" className="h-9 w-9" />
             <div>
-              <div className="font-serif text-[#F6F0E2] font-bold text-sm leading-none tracking-widest uppercase">
-                Squad
-              </div>
-              <div className="font-sans text-gold text-[10px] uppercase tracking-[0.2em] mt-0.5">
-                Dynasty
-              </div>
+              <div className="font-sans text-text font-bold text-h3 tracking-tight leading-none">Squad Dynasty</div>
+              <div className="text-small text-muted mt-0.5">Fantasy Football · 2026</div>
             </div>
           </Link>
 
@@ -39,10 +35,10 @@ export default function NavBar() {
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `px-3 py-1.5 text-xs font-sans uppercase tracking-wider rounded transition-all duration-150 ${
+                  `px-3.5 py-2 text-small font-medium rounded-md transition-all duration-150 ${
                     isActive
-                      ? 'text-gold border border-gold/40 bg-gold/8'
-                      : 'text-muted hover:text-[#F6F0E2] hover:bg-white/5'
+                      ? 'text-gold bg-goldLow'
+                      : 'text-text hover:bg-white/5'
                   }`
                 }
               >

@@ -7,7 +7,6 @@ import { useRosters } from '@/hooks/useRosters'
 import { useUsers } from '@/hooks/useUsers'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import DotDivider from '@/components/ui/DotDivider'
 
 const STATUS_LABEL: Record<string, string> = {
   pre: 'Pre-Season',
@@ -24,26 +23,27 @@ function formatDate(iso: string): string {
 
 function PreDraftBanner() {
   return (
-    <div className="relative overflow-hidden rounded border border-gold/25 bg-surface mb-10">
-      <span className="absolute top-2 left-3 text-gold/30 text-xs font-mono">┌</span>
-      <span className="absolute top-2 right-3 text-gold/30 text-xs font-mono">┐</span>
-      <span className="absolute bottom-2 left-3 text-gold/30 text-xs font-mono">└</span>
-      <span className="absolute bottom-2 right-3 text-gold/30 text-xs font-mono">┘</span>
-
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-64 h-64 rounded-full bg-gold/5 blur-3xl" />
-      </div>
-
-      <div className="relative flex flex-col items-center py-16 px-8 text-center">
-        <img src="/logo.svg" alt="" className="h-20 w-20 mb-6 opacity-90" />
-        <h1 className="font-serif text-[#F6F0E2] text-3xl font-bold tracking-wide mb-3">
-          Awaiting Draft
-        </h1>
-        <p className="text-muted text-sm font-sans max-w-sm leading-relaxed">
-          The 2026 season hasn't kicked off yet. Rosters and matchup data will populate after the startup draft.
-        </p>
-        <DotDivider className="my-6 w-24" />
-        <span className="font-sans text-muted text-[10px] uppercase tracking-[0.3em]">Est. 2026</span>
+    <div className="rounded-lg border border-borderLow bg-surface mb-10">
+      <div className="flex gap-8 items-start py-12 px-8">
+        <img src="/logo.svg" alt="" className="h-[120px] w-[120px] shrink-0 opacity-90" />
+        <div>
+          <p className="text-label text-gold uppercase tracking-[0.06em] font-semibold mb-2">Pre-season</p>
+          <h1 className="text-hero font-bold text-text mb-3">Awaiting the startup draft</h1>
+          <p className="text-body text-muted leading-relaxed max-w-xl mb-6">
+            The 2026 season hasn't kicked off yet. Rosters and matchup data will populate after the startup draft.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <button className="bg-gold text-[#1A1100] font-semibold text-small px-4 py-2.5 rounded-lg">
+              Draft · Jul 12, 2026
+            </button>
+            <Link
+              to="/bylaws"
+              className="border border-border text-text text-small font-medium px-4 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              Read the bylaws
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -62,7 +62,7 @@ function AnnouncementsWidget() {
         <SectionHeader className="mb-0">Latest News</SectionHeader>
         <Link
           to="/announcements"
-          className="text-muted hover:text-gold text-[10px] font-mono uppercase tracking-widest transition-colors"
+          className="text-small font-medium text-muted hover:text-gold transition-colors"
         >
           View all →
         </Link>
@@ -71,18 +71,18 @@ function AnnouncementsWidget() {
         {recent.map((a) => (
           <div
             key={a.id}
-            className={`bg-surface border rounded p-4 ${a.pinned ? 'border-gold/35' : 'border-gold/15'}`}
+            className={`bg-surface border rounded-lg p-4 ${a.pinned ? 'border-border' : 'border-borderLow'}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   {a.pinned && (
-                    <span className="text-[9px] font-sans text-gold uppercase tracking-wider shrink-0">📌</span>
+                    <span className="bg-goldLow text-gold text-label font-bold px-2.5 py-1 rounded-full shrink-0">Pinned</span>
                   )}
-                  <h3 className="font-serif text-[#F6F0E2] text-sm font-semibold truncate">{a.title}</h3>
+                  <h3 className="font-sans text-h3 font-semibold text-text truncate">{a.title}</h3>
                 </div>
-                <p className="text-muted text-[10px] font-mono mb-2">{formatDate(a.createdAt)}</p>
-                <p className="text-muted text-xs font-sans leading-relaxed line-clamp-2">{a.body}</p>
+                <p className="text-small text-mutedLow mb-2">{formatDate(a.createdAt)}</p>
+                <p className="text-base text-muted leading-relaxed line-clamp-2">{a.body}</p>
               </div>
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function Dashboard() {
       ) : (
         <>
           <SectionHeader>Week {nflState?.week} Matchups</SectionHeader>
-          <p className="text-muted text-sm mb-8">Matchup board coming soon.</p>
+          <p className="text-muted text-base mb-8">Matchup board coming soon.</p>
         </>
       )}
 
@@ -131,16 +131,17 @@ export default function Dashboard() {
           <SectionHeader>League at a Glance</SectionHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
             <Card className="py-5">
-              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Teams</div>
-              <div className="font-mono text-3xl text-[#F6F0E2] font-bold">{rosters.length}</div>
+              <div className="text-label text-muted uppercase font-sans mb-2">Teams</div>
+              <div className="text-numLg tabular text-text font-bold">{rosters.length}</div>
             </Card>
             <Card className="py-5">
-              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Season</div>
-              <div className="font-mono text-3xl text-[#F6F0E2] font-bold">2026</div>
+              <div className="text-label text-muted uppercase font-sans mb-2">Season</div>
+              <div className="text-numLg tabular text-text font-bold">2026</div>
             </Card>
             <Card className="py-5">
-              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Status</div>
-              <div className="font-mono text-lg text-gold font-semibold">{statusLabel}</div>
+              <div className="text-label text-muted uppercase font-sans mb-2">Status</div>
+              <div className="text-numLg text-gold font-semibold">{statusLabel}</div>
+              <div className="text-small text-gold font-medium mt-1">Draft Jul 12</div>
             </Card>
           </div>
 
@@ -148,28 +149,28 @@ export default function Dashboard() {
             <>
               <GoldRule className="mb-8" />
               <SectionHeader>Managers</SectionHeader>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {users.map((user) => (
-                  <div key={user.user_id} className="flex items-center gap-2 p-3 bg-surface border border-gold/10 rounded">
+                  <div key={user.user_id} className="flex items-center gap-2 p-3 bg-surface border border-borderLow rounded-lg">
                     {user.avatar ? (
                       <img
                         src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`}
                         alt=""
-                        className="w-7 h-7 rounded-full shrink-0"
+                        className="w-10 h-10 rounded-md shrink-0"
                       />
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-gold/20 shrink-0 flex items-center justify-center">
-                        <span className="text-gold text-[10px] font-serif font-bold">
+                      <div className="w-10 h-10 rounded-md bg-goldLow shrink-0 flex items-center justify-center">
+                        <span className="text-gold text-label font-sans font-bold">
                           {user.display_name[0].toUpperCase()}
                         </span>
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="text-[#F6F0E2] text-xs font-sans truncate">
+                      <div className="text-base font-semibold text-text truncate">
                         {user.metadata?.team_name || user.display_name}
                       </div>
                       {user.metadata?.team_name && (
-                        <div className="text-muted text-[10px] font-sans truncate">{user.display_name}</div>
+                        <div className="text-small text-muted truncate">{user.display_name}</div>
                       )}
                     </div>
                   </div>

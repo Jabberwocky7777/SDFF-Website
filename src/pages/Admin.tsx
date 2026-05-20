@@ -4,7 +4,6 @@ import { ADMIN_KEY } from '@/api/client'
 import { createAnnouncement, deleteAnnouncement, togglePin } from '@/api/announcements'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import GoldRule from '@/components/ui/GoldRule'
-import DotDivider from '@/components/ui/DotDivider'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -27,19 +26,14 @@ function AdminUnlock({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div className="max-w-sm mx-auto mt-16">
       <div className="flex flex-col items-center mb-8">
-        <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Admin Panel</h1>
-        <p className="text-muted text-xs font-sans uppercase tracking-widest">Commissioner access</p>
+        <h1 className="font-sans text-h1 font-bold text-text mb-1">Admin Panel</h1>
+        <p className="text-small text-muted">Commissioner access</p>
       </div>
 
-      <div className="relative bg-surface border border-gold/20 rounded p-6">
-        <span className="absolute top-2 left-3 text-gold/25 text-xs font-mono">┌</span>
-        <span className="absolute top-2 right-3 text-gold/25 text-xs font-mono">┐</span>
-        <span className="absolute bottom-2 left-3 text-gold/25 text-xs font-mono">└</span>
-        <span className="absolute bottom-2 right-3 text-gold/25 text-xs font-mono">┘</span>
-
+      <div className="bg-surface border border-borderLow rounded-lg p-6">
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-muted text-[10px] uppercase tracking-widest font-sans mb-2">
+            <label className="block text-label text-muted uppercase font-sans mb-2">
               Admin Password
             </label>
             <div className="relative">
@@ -49,14 +43,14 @@ function AdminUnlock({ onUnlock }: { onUnlock: () => void }) {
                 onChange={(e) => { setPwd(e.target.value); setError(false) }}
                 placeholder="Enter admin password"
                 autoFocus
-                className={`w-full bg-background border rounded px-3 py-2.5 pr-10 font-mono text-sm text-[#F6F0E2] placeholder-muted/50 outline-none transition-colors ${
-                  error ? 'border-red-500/60' : 'border-gold/20 focus:border-gold/50'
+                className={`w-full bg-background border rounded-lg px-3 py-2.5 pr-10 font-sans text-base text-text placeholder-muted/50 outline-none transition-colors ${
+                  error ? 'border-red-500/60' : 'border-borderLow focus:border-border'
                 }`}
               />
               <button
                 type="button"
                 onClick={() => setShow((s) => !s)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-[#F6F0E2] transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
               >
                 {show ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -71,12 +65,12 @@ function AdminUnlock({ onUnlock }: { onUnlock: () => void }) {
                 )}
               </button>
             </div>
-            {error && <p className="mt-1.5 text-red-400 text-xs font-sans">Invalid admin password.</p>}
+            {error && <p className="mt-1.5 text-red-400 text-small font-sans">Invalid admin password.</p>}
           </div>
           <button
             type="submit"
             disabled={!pwd.trim()}
-            className="w-full bg-gold text-background font-sans font-semibold text-sm py-2.5 rounded hover:opacity-90 disabled:opacity-40 transition-opacity"
+            className="w-full bg-gold text-background font-sans font-semibold text-base py-2.5 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
           >
             Unlock
           </button>
@@ -139,47 +133,42 @@ function AdminPanel() {
     <div>
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Admin Panel</h1>
-          <p className="text-muted text-sm font-sans">Post and manage league announcements.</p>
+          <h1 className="font-sans text-h1 font-bold text-text mb-1">Admin Panel</h1>
+          <p className="text-body text-muted">Post and manage league announcements.</p>
         </div>
         <button
           onClick={handleLogout}
-          className="text-muted hover:text-red-400 text-[10px] font-mono uppercase tracking-widest transition-colors"
+          className="text-small font-medium text-muted hover:text-red-400 transition-colors"
         >
           Lock
         </button>
       </div>
 
       {/* Create form */}
-      <div className="relative bg-surface border border-gold/20 rounded p-5 mb-8">
-        <span className="absolute top-2 left-3 text-gold/25 text-xs font-mono">┌</span>
-        <span className="absolute top-2 right-3 text-gold/25 text-xs font-mono">┐</span>
-        <span className="absolute bottom-2 left-3 text-gold/25 text-xs font-mono">└</span>
-        <span className="absolute bottom-2 right-3 text-gold/25 text-xs font-mono">┘</span>
-
-        <h2 className="font-sans text-gold text-xs uppercase tracking-widest font-semibold mb-4">
+      <div className="bg-surface border border-borderLow rounded-lg p-5 mb-8">
+        <h2 className="text-label text-muted uppercase tracking-[0.04em] font-semibold mb-4">
           New Announcement
         </h2>
 
         <form onSubmit={handleCreate} className="space-y-3">
           <div>
-            <label className="block text-muted text-[10px] uppercase tracking-widest font-sans mb-1.5">Title</label>
+            <label className="block text-label text-muted uppercase font-sans mb-1.5">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Announcement title"
-              className="w-full bg-background border border-gold/20 focus:border-gold/50 rounded px-3 py-2 font-sans text-sm text-[#F6F0E2] placeholder-muted/50 outline-none transition-colors"
+              className="w-full bg-background border border-borderLow focus:border-border rounded-lg px-3 py-2 font-sans text-base text-text placeholder-muted/50 outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="block text-muted text-[10px] uppercase tracking-widest font-sans mb-1.5">Body</label>
+            <label className="block text-label text-muted uppercase font-sans mb-1.5">Body</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write your announcement here…"
               rows={5}
-              className="w-full bg-background border border-gold/20 focus:border-gold/50 rounded px-3 py-2 font-sans text-sm text-[#F6F0E2] placeholder-muted/50 outline-none transition-colors resize-y"
+              className="w-full bg-background border border-borderLow focus:border-border rounded-lg px-3 py-2 font-sans text-base text-text placeholder-muted/50 outline-none transition-colors resize-y"
             />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -189,13 +178,13 @@ function AdminPanel() {
               onChange={(e) => setPinned(e.target.checked)}
               className="accent-gold"
             />
-            <span className="text-muted text-xs font-sans">Pin this announcement</span>
+            <span className="text-small text-muted font-sans">Pin this announcement</span>
           </label>
-          {formError && <p className="text-red-400 text-xs font-sans">{formError}</p>}
+          {formError && <p className="text-small text-red-400 font-sans">{formError}</p>}
           <button
             type="submit"
             disabled={submitting}
-            className="bg-gold text-background font-sans font-semibold text-sm px-5 py-2 rounded hover:opacity-90 disabled:opacity-40 transition-opacity"
+            className="bg-gold text-background font-sans font-semibold text-base px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
           >
             {submitting ? 'Posting…' : 'Post Announcement'}
           </button>
@@ -205,43 +194,43 @@ function AdminPanel() {
       <GoldRule className="mb-6" />
 
       {/* Existing announcements */}
-      <h2 className="font-sans text-gold text-xs uppercase tracking-widest font-semibold mb-4">
+      <h2 className="text-label text-muted uppercase tracking-[0.04em] font-semibold mb-4">
         Existing ({announcements?.length ?? 0})
       </h2>
 
       {(!announcements || announcements.length === 0) && (
-        <p className="text-muted text-sm font-sans">No announcements yet.</p>
+        <p className="text-base text-muted font-sans">No announcements yet.</p>
       )}
 
       <div className="space-y-3">
         {announcements?.map((a) => (
           <div
             key={a.id}
-            className={`bg-surface border rounded p-4 flex items-start gap-3 ${
-              a.pinned ? 'border-gold/30' : 'border-gold/15'
+            className={`bg-surface border rounded-lg p-4 flex items-start gap-3 ${
+              a.pinned ? 'border-border' : 'border-borderLow'
             }`}
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 {a.pinned && (
-                  <span className="text-[9px] font-sans text-gold uppercase tracking-wider">📌 Pinned</span>
+                  <span className="text-label text-gold font-semibold">Pinned</span>
                 )}
-                <span className="font-serif text-[#F6F0E2] text-sm font-semibold">{a.title}</span>
+                <span className="font-sans text-base font-semibold text-text">{a.title}</span>
               </div>
-              <p className="text-muted text-[10px] font-mono">{formatDate(a.createdAt)}</p>
-              <p className="text-muted text-xs font-sans mt-1 line-clamp-2">{a.body}</p>
+              <p className="text-small text-mutedLow">{formatDate(a.createdAt)}</p>
+              <p className="text-small text-muted mt-1 line-clamp-2">{a.body}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handlePin(a.id)}
-                className="text-muted hover:text-gold text-[10px] font-mono uppercase tracking-widest transition-colors"
+                className="text-small font-medium text-muted hover:text-gold transition-colors"
                 title={a.pinned ? 'Unpin' : 'Pin'}
               >
                 {a.pinned ? 'Unpin' : 'Pin'}
               </button>
               <button
                 onClick={() => handleDelete(a.id)}
-                className="text-muted hover:text-red-400 text-[10px] font-mono uppercase tracking-widest transition-colors"
+                className="text-small font-medium text-muted hover:text-red-400 transition-colors"
               >
                 Delete
               </button>
@@ -249,8 +238,6 @@ function AdminPanel() {
           </div>
         ))}
       </div>
-
-      <DotDivider className="mt-8 w-16" />
     </div>
   )
 }

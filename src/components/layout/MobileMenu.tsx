@@ -27,8 +27,8 @@ export default function MobileMenu({ links, open, onClose }: Props) {
             end={to === '/'}
             onClick={onClose}
             className={({ isActive }) =>
-              `w-full max-w-xs text-center py-4 font-serif text-xl border-b border-gold/10 transition-colors ${
-                isActive ? 'text-gold' : 'text-[#F6F0E2] hover:text-gold'
+              `w-full max-w-xs text-center py-4 font-sans text-xl border-b border-borderLow transition-colors ${
+                isActive ? 'text-gold' : 'text-text hover:text-gold'
               }`
             }
           >

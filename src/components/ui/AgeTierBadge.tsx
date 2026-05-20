@@ -22,7 +22,7 @@ export default function AgeTierBadge({ tier }: Props) {
   return (
     <span
       title={LABEL[tier]}
-      className={`${COLOR[tier]} text-xs leading-none`}
+      className={`${COLOR[tier]} text-small leading-none`}
       aria-label={LABEL[tier]}
     >
       ●

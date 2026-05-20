@@ -41,14 +41,14 @@ function calcScore(s: Stats): ScoreLine[] {
 
 function NumInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gold/10 last:border-0">
-      <label className="text-muted text-xs font-sans">{label}</label>
+    <div className="flex items-center justify-between py-2.5 border-b border-borderLow last:border-0">
+      <label className="text-small text-muted font-sans">{label}</label>
       <input
         type="number"
         value={value}
         min={0}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-20 bg-background border border-gold/20 text-[#F6F0E2] font-mono text-sm px-2 py-1.5 text-right rounded focus:outline-none focus:border-gold/60 focus:ring-1 focus:ring-gold/20 transition-colors"
+        className="w-20 bg-background border border-borderLow text-text font-mono text-base px-2 py-1.5 text-right rounded-lg focus:outline-none focus:border-border focus:ring-1 focus:ring-gold/20 transition-colors"
       />
     </div>
   )
@@ -63,13 +63,13 @@ export default function ScoringCalc() {
 
   return (
     <div>
-      <Link to="/bylaws" className="text-gold/70 text-xs font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
+      <Link to="/bylaws" className="text-gold/70 text-small font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
         ← Rules & FAQs
       </Link>
 
       <div className="mb-8">
-        <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Scoring Calculator</h1>
-        <p className="text-muted text-sm font-sans">
+        <h1 className="font-sans text-h1 font-bold text-text mb-1">Scoring Calculator</h1>
+        <p className="text-body text-muted">
           Enter any stat line to see the exact SDFF point total, including all bonus stacking.
         </p>
       </div>
@@ -79,16 +79,16 @@ export default function ScoringCalc() {
         <Card>
           {/* Position selector */}
           <div className="mb-4">
-            <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-2">Position</div>
+            <div className="text-label text-muted uppercase font-sans mb-2">Position</div>
             <div className="flex gap-2">
               {(['QB', 'RB', 'WR', 'TE'] as const).map((pos) => (
                 <button
                   key={pos}
                   onClick={() => set('position', pos)}
-                  className={`font-mono text-xs px-3 py-1.5 border rounded transition-all ${
+                  className={`font-sans text-small px-3 py-1.5 border rounded-lg transition-all ${
                     stats.position === pos
-                      ? 'border-gold bg-gold/10 text-gold font-semibold'
-                      : 'border-gold/20 text-muted hover:border-gold/40 hover:text-[#F6F0E2]'
+                      ? 'border-gold bg-goldLow text-gold font-semibold'
+                      : 'border-borderLow text-muted hover:border-border hover:text-text'
                   }`}
                 >
                   {pos}
@@ -130,7 +130,7 @@ export default function ScoringCalc() {
                   onChange={(e) => set(key as keyof Stats, e.target.checked as Stats[keyof Stats])}
                   className="w-4 h-4 accent-gold"
                 />
-                <span className="text-muted text-xs font-sans group-hover:text-[#C8C4B8] transition-colors">
+                <span className="text-small text-muted font-sans group-hover:text-text transition-colors">
                   {label}
                 </span>
               </label>
@@ -141,25 +141,25 @@ export default function ScoringCalc() {
         {/* Output */}
         <div className="flex flex-col gap-4">
           <Card className="py-6 text-center">
-            <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-3">Total Score</div>
+            <div className="text-label text-muted uppercase font-sans mb-3">Total Score</div>
             <div className={`font-mono font-bold leading-none mb-2 ${
               total === 0 ? 'text-muted text-5xl' :
               total < 0  ? 'text-red-400 text-5xl' :
-                           'text-[#F6F0E2] text-6xl'
+                           'text-text text-6xl'
             }`}>
               {total.toFixed(2)}
             </div>
-            <div className="text-muted text-xs font-sans">fantasy points</div>
+            <div className="text-small text-muted font-sans">fantasy points</div>
           </Card>
 
           {lines.length > 0 && (
             <Card>
-              <div className="text-muted text-[10px] uppercase tracking-widest font-sans mb-3">Breakdown</div>
+              <div className="text-label text-muted uppercase font-sans mb-3">Breakdown</div>
               <div>
                 {lines.map((line) => (
-                  <div key={line.label} className="flex justify-between items-center py-2 border-b border-gold/10 last:border-0">
-                    <span className="text-muted text-xs font-sans">{line.label}</span>
-                    <span className={`font-mono text-sm tabular-nums ${line.value >= 0 ? 'text-[#F6F0E2]' : 'text-red-400'}`}>
+                  <div key={line.label} className="flex justify-between items-center py-2 border-b border-borderLow last:border-0">
+                    <span className="text-small text-muted font-sans">{line.label}</span>
+                    <span className={`font-mono text-num tabular ${line.value >= 0 ? 'text-text' : 'text-red-400'}`}>
                       {line.value >= 0 ? '+' : ''}{line.value.toFixed(2)}
                     </span>
                   </div>
@@ -167,8 +167,8 @@ export default function ScoringCalc() {
               </div>
               <GoldRule className="my-3" />
               <div className="flex justify-between items-center">
-                <span className="text-gold text-[10px] font-sans uppercase tracking-wider">Total</span>
-                <span className={`font-mono text-base font-bold ${total >= 0 ? 'text-gold' : 'text-red-400'}`}>
+                <span className="text-label text-gold uppercase font-sans">Total</span>
+                <span className={`font-mono text-num font-bold ${total >= 0 ? 'text-gold' : 'text-red-400'}`}>
                   {total.toFixed(2)}
                 </span>
               </div>
@@ -176,8 +176,8 @@ export default function ScoringCalc() {
           )}
 
           {lines.length === 0 && (
-            <div className="bg-surface border border-gold/10 rounded p-6 text-center">
-              <p className="text-muted text-sm font-sans">Enter stats on the left to see your score.</p>
+            <div className="bg-surface border border-borderLow rounded-lg p-6 text-center">
+              <p className="text-base text-muted font-sans">Enter stats on the left to see your score.</p>
             </div>
           )}
         </div>

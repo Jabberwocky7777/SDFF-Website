@@ -5,32 +5,20 @@
 @layer base {
   html {
     background-color: #111214;
-    color: #F6F0E2;
+    color: #F4EFE2;
     font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
+  body { margin: 0; }
+  * { box-sizing: border-box; }
 
-  body {
-    margin: 0;
-  }
+  .tabular { font-variant-numeric: tabular-nums; }
 
-  * {
-    box-sizing: border-box;
-  }
-
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #111214;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(196, 149, 42, 0.3);
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(196, 149, 42, 0.6);
-  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #111214; }
+  ::-webkit-scrollbar-thumb { background: rgba(224,181,68,0.35); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(224,181,68,0.6); }
 }

@@ -36,8 +36,8 @@ export default function Rosters() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Rosters</h1>
-        <p className="text-muted text-sm font-sans">
+        <h1 className="font-sans text-h1 font-bold text-text mb-1">Rosters</h1>
+        <p className="text-body text-muted">
           {playersLoading
             ? 'Loading player data…'
             : 'Click any team to see their full roster with age tiers and taxi squad.'}
@@ -50,15 +50,15 @@ export default function Rosters() {
 
           return (
             <Link key={roster.rosterId} to={`/rosters/${roster.rosterId}`}>
-              <Card className="hover:border-gold/50 transition-all duration-150 cursor-pointer h-full">
+              <Card className="hover:border-border transition-all duration-150 cursor-pointer h-full">
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gold/10">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-borderLow">
                   <ShieldAvatar avatarUrl={roster.avatarUrl} teamName={roster.teamName} size={38} />
                   <div className="min-w-0">
-                    <div className="font-serif text-[#F6F0E2] font-semibold text-sm leading-tight truncate">
+                    <div className="font-sans text-base font-semibold text-text leading-tight truncate">
                       {roster.teamName}
                     </div>
-                    <div className="text-muted text-xs font-sans mt-0.5">
+                    <div className="text-small text-muted mt-0.5">
                       {hasPlayers
                         ? `${roster.starters.length + roster.bench.length} players${roster.taxi.length ? ` · ${roster.taxi.length} taxi` : ''}`
                         : 'No players yet'}
@@ -70,26 +70,26 @@ export default function Rosters() {
                 {hasPlayers ? (
                   <div className="space-y-1.5">
                     {roster.starters.slice(0, 5).map((player) => (
-                      <div key={player.playerId} className="flex items-center gap-2 text-xs">
-                        <span className="text-gold/60 font-mono w-7 shrink-0 text-right">{player.position}</span>
-                        <span className="text-[#C8C4B8] truncate flex-1">{player.fullName}</span>
+                      <div key={player.playerId} className="flex items-center gap-2">
+                        <span className="text-label text-gold/70 font-mono w-7 shrink-0 text-right">{player.position}</span>
+                        <span className="text-small text-text truncate flex-1">{player.fullName}</span>
                         <AgeTierBadge tier={player.ageTier} />
                       </div>
                     ))}
                     {roster.starters.length > 5 && (
-                      <div className="text-muted text-xs pl-9">
+                      <div className="text-small text-muted pl-9">
                         +{roster.starters.length - 5 + roster.bench.length} more
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-muted text-xs font-sans italic">
+                  <p className="text-base text-muted font-sans italic">
                     Roster populates after the draft.
                   </p>
                 )}
 
                 {taxiLocked && roster.taxi.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-gold/10 text-[10px] text-muted font-sans">
+                  <div className="mt-3 pt-2 border-t border-borderLow text-small text-muted font-sans">
                     🔒 Taxi locked for season
                   </div>
                 )}

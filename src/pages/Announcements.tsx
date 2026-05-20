@@ -16,12 +16,12 @@ export default function Announcements() {
     <div>
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold mb-1">Announcements</h1>
-          <p className="text-muted text-sm font-sans">League news and updates from the commissioner.</p>
+          <h1 className="font-sans text-h1 font-bold text-text mb-1">Announcements</h1>
+          <p className="text-body text-muted">League news and updates from the commissioner.</p>
         </div>
         <Link
           to="/admin"
-          className="text-muted hover:text-gold text-[10px] font-mono uppercase tracking-widest transition-colors"
+          className="text-small font-medium text-muted hover:text-gold transition-colors"
         >
           Admin →
         </Link>
@@ -30,8 +30,8 @@ export default function Announcements() {
       {isLoading && <SkeletonLoader rows={4} />}
 
       {!isLoading && (!announcements || announcements.length === 0) && (
-        <div className="bg-surface border border-gold/15 rounded p-8 text-center">
-          <p className="text-muted text-sm font-sans">No announcements yet. Check back soon.</p>
+        <div className="bg-surface border border-borderLow rounded-lg p-8 text-center">
+          <p className="text-base text-muted font-sans">No announcements yet. Check back soon.</p>
         </div>
       )}
 
@@ -40,21 +40,21 @@ export default function Announcements() {
           {announcements.map((a) => (
             <article
               key={a.id}
-              className={`relative bg-surface border rounded p-5 ${
-                a.pinned ? 'border-gold/40 shadow-[0_0_20px_rgba(196,149,42,0.06)]' : 'border-gold/15'
+              className={`relative bg-surface border rounded-lg p-5 ${
+                a.pinned ? 'border-border shadow-[0_0_20px_rgba(224,181,68,0.06)]' : 'border-borderLow'
               }`}
             >
               {a.pinned && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-sans uppercase tracking-wider text-gold border border-gold/30 px-1.5 py-0.5 rounded mb-3">
-                  📌 Pinned
+                <span className="inline-flex items-center bg-goldLow text-gold text-label font-bold px-2.5 py-1 rounded-full mb-3">
+                  Pinned
                 </span>
               )}
-              <h2 className="font-serif text-[#F6F0E2] text-lg font-semibold mb-1">{a.title}</h2>
-              <p className="text-muted text-[10px] font-mono uppercase tracking-widest mb-3">
+              <h2 className="font-sans text-h3 font-semibold text-text mb-1">{a.title}</h2>
+              <p className="text-small text-mutedLow mb-3">
                 {formatDate(a.createdAt)}
               </p>
               <GoldRule className="mb-3" />
-              <p className="text-[#F6F0E2] text-sm font-sans leading-relaxed whitespace-pre-wrap">{a.body}</p>
+              <p className="text-base text-text leading-relaxed whitespace-pre-wrap">{a.body}</p>
             </article>
           ))}
         </div>

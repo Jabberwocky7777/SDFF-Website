@@ -1,6 +1,5 @@
 import { FormEvent, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import DotDivider from '@/components/ui/DotDivider'
 
 export default function SplashScreen() {
   const { setPassword } = useAuth()
@@ -27,30 +26,18 @@ export default function SplashScreen() {
       <div className="w-full max-w-sm">
         {/* Logo + branding */}
         <div className="flex flex-col items-center mb-10">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-32 h-32 rounded-full bg-gold/8 blur-2xl" />
-            </div>
-            <img src="/logo.svg" alt="SDFF" className="relative h-16 w-16 opacity-90" />
-          </div>
-          <h1 className="font-serif text-[#F6F0E2] text-2xl font-bold tracking-wide mb-1">
+          <img src="/logo.svg" alt="SDFF" className="h-16 w-16 opacity-90 mb-6" />
+          <h1 className="font-sans text-h1 font-bold text-text tracking-tight mb-1">
             Squad Dynasty FF
           </h1>
-          <p className="text-muted text-xs font-sans uppercase tracking-[0.25em]">
-            Members only
-          </p>
+          <p className="text-small text-muted">Members only</p>
         </div>
 
         {/* Password card */}
-        <div className="relative bg-surface border border-gold/20 rounded p-6">
-          <span className="absolute top-2 left-3 text-gold/25 text-xs font-mono">┌</span>
-          <span className="absolute top-2 right-3 text-gold/25 text-xs font-mono">┐</span>
-          <span className="absolute bottom-2 left-3 text-gold/25 text-xs font-mono">└</span>
-          <span className="absolute bottom-2 right-3 text-gold/25 text-xs font-mono">┘</span>
-
+        <div className="bg-surface border border-borderLow rounded-lg p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-muted text-[10px] uppercase tracking-widest font-sans mb-2">
+              <label className="block text-label text-muted uppercase font-sans mb-2">
                 League Password
               </label>
               <div className="relative">
@@ -60,16 +47,16 @@ export default function SplashScreen() {
                   onChange={(e) => { setValue(e.target.value); setError(false) }}
                   placeholder="Enter password"
                   autoFocus
-                  className={`w-full bg-background border rounded px-3 py-2.5 pr-10 font-mono text-sm text-[#F6F0E2] placeholder-muted/50 outline-none transition-colors ${
+                  className={`w-full bg-background border rounded-lg px-3 py-2.5 pr-10 font-sans text-base text-text placeholder-muted/50 outline-none transition-colors ${
                     error
                       ? 'border-red-500/60 focus:border-red-400'
-                      : 'border-gold/20 focus:border-gold/50'
+                      : 'border-borderLow focus:border-border'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShow((s) => !s)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-[#F6F0E2] transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
                   aria-label={show ? 'Hide password' : 'Show password'}
                 >
                   {show ? (
@@ -86,24 +73,19 @@ export default function SplashScreen() {
                 </button>
               </div>
               {error && (
-                <p className="mt-1.5 text-red-400 text-xs font-sans">Incorrect password. Try again.</p>
+                <p className="mt-1.5 text-red-400 text-small font-sans">Incorrect password. Try again.</p>
               )}
             </div>
 
             <button
               type="submit"
               disabled={loading || !value.trim()}
-              className="w-full bg-gold text-background font-sans font-semibold text-sm py-2.5 rounded transition-opacity disabled:opacity-40 hover:opacity-90"
+              className="w-full bg-gold text-background font-sans font-semibold text-base py-2.5 rounded-lg transition-opacity disabled:opacity-40 hover:opacity-90"
             >
               {loading ? 'Checking…' : 'Enter'}
             </button>
           </form>
         </div>
-
-        <DotDivider className="my-8 w-24 mx-auto" />
-        <p className="text-center text-muted text-[10px] font-mono uppercase tracking-[0.25em]">
-          · · · Est. 2026 · · ·
-        </p>
       </div>
     </div>
   )
