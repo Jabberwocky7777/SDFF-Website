@@ -8,12 +8,3 @@ cache/*.json
 *.log
 .git/
 .github/
-*.md
-.gitignore
-src/
-public/
-index.html
-tsconfig*.json
-*.config.ts
-*.config.js
-postcss.config.js
