@@ -16,6 +16,7 @@ export interface TeamRecord {
   pa: number
   mpf: number
   streak: number   // positive = win streak, negative = loss streak
+  luckIndex: number  // (h2hWinPct - pfRankPct) * 100; positive = lucky, negative = unlucky
   seed?: number
 }
 

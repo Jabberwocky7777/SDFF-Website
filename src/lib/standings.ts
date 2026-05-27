@@ -32,6 +32,7 @@ export function computeStandings(
       pa,
       mpf: getMpf(roster),
       streak: 0,
+      luckIndex: 0,  // computed after sorting by PF below
     })
   }
 
@@ -75,7 +76,20 @@ export function computeStandings(
     record.streak = streak
   }
 
-  const sorted = Array.from(records.values()).sort((a, b) => {
+  const allRecords = Array.from(records.values())
+
+  // Compute luck index: h2hWinPct vs expected win% from PF rank
+  const byPf = [...allRecords].sort((a, b) => b.pf - a.pf)
+  const n = byPf.length
+  byPf.forEach((rec, pfRankIdx) => {
+    const h2hTotal = rec.h2hWins + rec.h2hLosses + rec.h2hTies
+    const h2hWinPct = h2hTotal > 0 ? rec.h2hWins / h2hTotal : 0
+    // PF rank 1 = best scorer (expected win pct = (n-1)/n), rank n = worst
+    const expectedWinPct = n > 1 ? (n - 1 - pfRankIdx) / (n - 1) : 0
+    rec.luckIndex = Math.round((h2hWinPct - expectedWinPct) * 100)
+  })
+
+  const sorted = allRecords.sort((a, b) => {
     if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins
     return b.pf - a.pf
   })

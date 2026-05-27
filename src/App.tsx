@@ -11,6 +11,9 @@ import Bylaws from '@/pages/Bylaws'
 import ScoringCalc from '@/pages/ScoringCalc'
 import Announcements from '@/pages/Announcements'
 import Admin from '@/pages/Admin'
+import Dues from '@/pages/Dues'
+import Picks from '@/pages/Picks'
+import DraftBoard from '@/pages/DraftBoard'
 
 function AppRoutes() {
   const { authed, checking } = useAuth()
@@ -39,6 +42,9 @@ function AppRoutes() {
           <Route path="bylaws/scoring" element={<ScoringCalc />} />
           <Route path="announcements" element={<Announcements />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="dues" element={<Dues />} />
+          <Route path="picks" element={<Picks />} />
+          <Route path="draft" element={<DraftBoard />} />
         </Route>
       </Routes>
     </BrowserRouter>

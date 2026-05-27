@@ -1,16 +1,16 @@
-import GoldRule from '@/components/ui/GoldRule'
 import { timelineEvents } from '@/data/timeline'
+import type { TimelineEvent } from '@/types/domain'
 
-const TYPE_STYLES: Record<string, { badge: string; dot: string }> = {
-  draft:    { badge: 'bg-gold/20 text-gold border border-gold/40',            dot: 'bg-gold' },
-  deadline: { badge: 'bg-red-500/15 text-red-400 border border-red-500/30',   dot: 'bg-red-400' },
-  playoffs: { badge: 'bg-blue-500/15 text-blue-300 border border-blue-500/30', dot: 'bg-blue-400' },
-  offseason:{ badge: 'bg-surface border border-borderLow text-muted',          dot: 'bg-muted' },
-  waiver:   { badge: 'bg-green-500/15 text-green-400 border border-green-500/30', dot: 'bg-green-400' },
-  season:   { badge: 'bg-surface border border-gold/30 text-gold/80',          dot: 'bg-gold/60' },
+const TYPE_COLORS: Record<TimelineEvent['type'], { badge: string; dot: string; label: string }> = {
+  draft:     { badge: 'bg-gold/20 text-gold border border-gold/30',                    dot: 'bg-gold',        label: 'Draft' },
+  deadline:  { badge: 'bg-orange-900/30 text-orange-300 border border-orange-500/30',  dot: 'bg-orange-400',  label: 'Deadline' },
+  season:    { badge: 'bg-blue-900/30 text-blue-300 border border-blue-500/30',        dot: 'bg-blue-400',    label: 'Season' },
+  playoffs:  { badge: 'bg-purple-900/30 text-purple-300 border border-purple-500/30',  dot: 'bg-purple-400',  label: 'Playoffs' },
+  offseason: { badge: 'bg-teal-900/30 text-teal-300 border border-teal-500/30',        dot: 'bg-teal-400',    label: 'Offseason' },
+  waiver:    { badge: 'bg-zinc-800 text-zinc-300 border border-zinc-600/40',           dot: 'bg-zinc-400',    label: 'Waivers' },
 }
 
-function formatDate(iso: string): string {
+function formatEventDate(iso: string): string {
   return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   })
@@ -20,72 +20,82 @@ function isPast(iso: string): boolean {
   return new Date(iso + 'T23:59:59') < new Date()
 }
 
-export default function Timeline() {
-  const nextIdx = timelineEvents.findIndex((e) => !isPast(e.date))
+const sorted = [...timelineEvents].sort(
+  (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+)
 
+const firstUpcomingIndex = sorted.findIndex((e) => !isPast(e.date))
+
+export default function Timeline() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="font-sans text-h1 font-bold text-text mb-1">League Calendar</h1>
-        <p className="text-body text-muted">Key dates for the SDFF 2026 season.</p>
+      <div className="mb-10">
+        <h1 className="font-sans text-hero font-bold text-text mb-2">League Timeline</h1>
+        <p className="text-body text-muted leading-relaxed max-w-2xl">
+          Key dates for the 2026 SDFF season and beyond. Past events are dimmed; the next upcoming event is highlighted.
+        </p>
       </div>
 
-      <div className="relative pl-0 sm:pl-36">
-        {/* Vertical connector line */}
-        <div className="hidden sm:block absolute left-[7.25rem] top-3 bottom-3 w-px bg-borderLow" />
+      <div className="relative">
+        {/* Vertical spine */}
+        <div className="absolute left-[7.5rem] sm:left-[10rem] top-0 bottom-0 w-px bg-borderLow" aria-hidden="true" />
 
-        <div className="space-y-4">
-          {timelineEvents.map((event, i) => {
+        <div className="space-y-0">
+          {sorted.map((event, idx) => {
             const past = isPast(event.date)
-            const isNext = i === nextIdx
-            const styles = TYPE_STYLES[event.type] ?? TYPE_STYLES.offseason
+            const isNextUp = idx === firstUpcomingIndex
+            const colors = TYPE_COLORS[event.type]
 
             return (
-              <div key={event.id} className={`relative flex flex-col sm:flex-row gap-3 ${past ? 'opacity-35' : ''}`}>
-
-                {/* Date label */}
-                <div className="hidden sm:block absolute right-[calc(100%+1.75rem)] top-3.5 w-28 text-right">
-                  <span className="text-small text-muted leading-none whitespace-nowrap">
-                    {formatDate(event.date)}
+              <div
+                key={event.id}
+                className={`relative flex transition-opacity ${past ? 'opacity-40' : 'opacity-100'}`}
+              >
+                {/* Date label — left column */}
+                <div className="w-[7.5rem] sm:w-[10rem] shrink-0 pt-[1.15rem] pr-5 text-right">
+                  <span className="font-mono text-label text-muted leading-none">
+                    {formatEventDate(event.date)}
                   </span>
                 </div>
 
-                {/* Dot on the line */}
-                <div className="hidden sm:block absolute left-[-1.75rem] top-3.5 -translate-x-[3px]">
-                  <div className={`w-2.5 h-2.5 rounded-full transition-all ${
-                    isNext
-                      ? 'ring-2 ring-gold/40 ring-offset-1 ring-offset-background ' + styles.dot
-                      : styles.dot
+                {/* Dot — sits on the spine */}
+                <div className="relative shrink-0" style={{ width: 0 }}>
+                  <div className={`absolute top-[1.15rem] -translate-x-1/2 w-3 h-3 rounded-full border-2 border-background z-10 ${
+                    isNextUp && !past
+                      ? 'bg-gold ring-2 ring-gold/40 ring-offset-1 ring-offset-background animate-pulse'
+                      : colors.dot
                   }`} />
                 </div>
 
-                {/* Mobile date */}
-                <div className="sm:hidden text-small text-muted">
-                  {formatDate(event.date)}
-                </div>
-
-                {/* Event card */}
-                <div className={`flex-1 bg-surface border px-4 py-3 rounded-lg transition-all ${
-                  isNext ? 'border-gold/50 shadow-[0_0_16px_rgba(224,181,68,0.08)]' : 'border-borderLow'
-                }`}>
-                  <div className="flex items-start gap-2 flex-wrap">
-                    <span className={`font-sans text-base font-semibold leading-snug ${past ? 'text-muted' : 'text-text'}`}>
-                      {event.label}
-                    </span>
-                    <span className={`text-label px-1.5 py-0.5 rounded-sm uppercase tracking-[0.04em] shrink-0 ${styles.badge}`}>
-                      {event.type}
-                    </span>
-                    {isNext && (
-                      <span className="text-label px-1.5 py-0.5 rounded-sm uppercase font-bold bg-gold text-background shrink-0">
-                        Next Up
-                      </span>
-                    )}
-                  </div>
-                  {event.description && (
-                    <p className="text-small text-muted leading-relaxed mt-1.5">
-                      {event.description}
-                    </p>
+                {/* Event card — right column */}
+                <div className="flex-1 pl-7 pb-5 pt-3">
+                  {isNextUp && (
+                    <div className="text-label font-bold text-gold uppercase tracking-[0.06em] mb-1.5">
+                      Next Up
+                    </div>
                   )}
+
+                  <div className={`bg-surface rounded-lg p-4 border ${
+                    isNextUp && !past
+                      ? 'border-l-2 border-l-gold border-gold/30'
+                      : 'border-borderLow'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-sans text-h3 font-semibold text-text mb-1 leading-snug">
+                          {event.label}
+                        </h3>
+                        {event.description && (
+                          <p className="text-base text-muted leading-relaxed">
+                            {event.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`shrink-0 text-label font-semibold px-2.5 py-1 rounded-full whitespace-nowrap mt-0.5 ${colors.badge}`}>
+                        {colors.label}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )
@@ -93,10 +103,17 @@ export default function Timeline() {
         </div>
       </div>
 
-      <GoldRule className="mt-10 mb-4" />
-      <p className="text-small text-muted">
-        Rookie draft is scheduled one week after the NFL Draft concludes. Future season dates confirmed annually.
-      </p>
+      {/* Legend */}
+      <div className="mt-8 bg-surface border border-borderLow rounded-lg p-5">
+        <div className="text-label uppercase font-bold text-muted mb-3">Legend</div>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(TYPE_COLORS) as TimelineEvent['type'][]).map((type) => (
+            <span key={type} className={`text-label font-semibold px-2.5 py-1 rounded-full ${TYPE_COLORS[type].badge}`}>
+              {TYPE_COLORS[type].label}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

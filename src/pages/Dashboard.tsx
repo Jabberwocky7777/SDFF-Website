@@ -7,6 +7,8 @@ import { useRosters } from '@/hooks/useRosters'
 import { useUsers } from '@/hooks/useUsers'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
+import FaabTracker from '@/components/FaabTracker'
+import TransactionFeed from '@/components/TransactionFeed'
 
 const STATUS_LABEL: Record<string, string> = {
   pre: 'Pre-Season',
@@ -178,6 +180,12 @@ export default function Dashboard() {
               </div>
             </>
           )}
+
+          <GoldRule className="my-8" />
+          <FaabTracker />
+
+          <GoldRule className="my-8" />
+          <TransactionFeed />
         </>
       )}
     </div>
