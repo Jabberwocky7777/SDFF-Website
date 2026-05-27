@@ -3,12 +3,14 @@ import SectionHeader from '@/components/ui/SectionHeader'
 import Card from '@/components/ui/Card'
 import GoldRule from '@/components/ui/GoldRule'
 import { useNflState } from '@/hooks/useNflState'
+import { useLeague } from '@/hooks/useLeague'
 import { useRosters } from '@/hooks/useRosters'
 import { useUsers } from '@/hooks/useUsers'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import FaabTracker from '@/components/FaabTracker'
 import TransactionFeed from '@/components/TransactionFeed'
+import { LEAGUE_CONFIG } from '@/data/leagueConfig'
 
 const STATUS_LABEL: Record<string, string> = {
   pre: 'Pre-Season',
@@ -17,27 +19,57 @@ const STATUS_LABEL: Record<string, string> = {
   post: 'Playoffs',
 }
 
+const LEAGUE_STATUS_LABEL: Record<string, string> = {
+  pre_draft: 'Pre-Draft',
+  drafting:  'Drafting',
+  in_season: 'In Season',
+  complete:  'Complete',
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   })
 }
 
-function PreDraftBanner() {
+function formatDraftDate(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
+const DRAFT_DATE_DISPLAY = formatDraftDate(LEAGUE_CONFIG.draft.startupDraftDate)
+
+function PreDraftBanner({ isDrafting }: { isDrafting?: boolean }) {
   return (
     <div className="rounded-lg border border-borderLow bg-surface mb-10">
       <div className="flex gap-8 items-start py-12 px-8">
         <img src="/logo.svg" alt="" className="h-[120px] w-[120px] shrink-0 opacity-90" />
         <div>
-          <p className="text-label text-gold uppercase tracking-[0.06em] font-semibold mb-2">Pre-season</p>
-          <h1 className="text-hero font-bold text-text mb-3">Awaiting the startup draft</h1>
+          <p className="text-label text-gold uppercase tracking-[0.06em] font-semibold mb-2">
+            {isDrafting ? 'Draft in progress' : 'Pre-season'}
+          </p>
+          <h1 className="text-hero font-bold text-text mb-3">
+            {isDrafting ? 'Startup draft underway' : 'Awaiting the startup draft'}
+          </h1>
           <p className="text-body text-muted leading-relaxed max-w-xl mb-6">
-            The 2026 season hasn't kicked off yet. Rosters and matchup data will populate after the startup draft.
+            {isDrafting
+              ? 'The startup draft is live. Head to the Draft Board to follow picks in real time.'
+              : 'The 2026 season hasn\'t kicked off yet. Rosters and matchup data will populate after the startup draft.'}
           </p>
           <div className="flex gap-3 flex-wrap">
-            <button className="bg-gold text-[#1A1100] font-semibold text-small px-4 py-2.5 rounded-lg">
-              Draft · Jul 12, 2026
-            </button>
+            {isDrafting ? (
+              <Link
+                to="/draft"
+                className="bg-gold text-[#1A1100] font-semibold text-small px-4 py-2.5 rounded-lg"
+              >
+                Open Draft Board →
+              </Link>
+            ) : (
+              <div className="bg-gold text-[#1A1100] font-semibold text-small px-4 py-2.5 rounded-lg">
+                Draft · {DRAFT_DATE_DISPLAY}
+              </div>
+            )}
             <Link
               to="/bylaws"
               className="border border-border text-text text-small font-medium px-4 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
@@ -96,16 +128,25 @@ function AnnouncementsWidget() {
 
 export default function Dashboard() {
   const { data: nflState, isLoading: stateLoading } = useNflState()
+  const { data: league, isLoading: leagueLoading } = useLeague()
   const { data: rosters, isLoading: rostersLoading } = useRosters()
   const { data: users } = useUsers()
 
-  const isPreDraft = !nflState || nflState.season_type === 'pre' || nflState.season_type === 'off' || nflState.week === 0
+  // Use the league's own status as the primary signal — it's authoritative.
+  // Fall back to NFL state checks if the league object hasn't loaded yet.
+  const leagueStatus = league?.status
+  const isPreDraft = leagueStatus === 'pre_draft' ||
+    leagueStatus === 'drafting' ||
+    (!league && (!nflState || nflState.season_type === 'pre' || nflState.season_type === 'off' || nflState.week === 0))
+  const isDrafting = leagueStatus === 'drafting'
 
-  const statusLabel = nflState
+  const statusLabel = leagueStatus
+    ? LEAGUE_STATUS_LABEL[leagueStatus] ?? leagueStatus
+    : nflState
     ? STATUS_LABEL[nflState.season_type] ?? nflState.season_type
     : 'Pre-Draft'
 
-  if (stateLoading || rostersLoading) {
+  if (stateLoading || leagueLoading || rostersLoading) {
     return (
       <div>
         <SectionHeader>Dashboard</SectionHeader>
@@ -120,7 +161,7 @@ export default function Dashboard() {
       <AnnouncementsWidget />
 
       {isPreDraft ? (
-        <PreDraftBanner />
+        <PreDraftBanner isDrafting={isDrafting} />
       ) : (
         <>
           <SectionHeader>Week {nflState?.week} Matchups</SectionHeader>
@@ -138,12 +179,19 @@ export default function Dashboard() {
             </Card>
             <Card className="py-5">
               <div className="text-label text-muted uppercase font-sans mb-2">Season</div>
-              <div className="text-numLg tabular text-text font-bold">2026</div>
+              <div className="text-numLg tabular text-text font-bold">{league?.season ?? '2026'}</div>
             </Card>
             <Card className="py-5">
               <div className="text-label text-muted uppercase font-sans mb-2">Status</div>
               <div className="text-numLg text-gold font-semibold">{statusLabel}</div>
-              <div className="text-small text-gold font-medium mt-1">Draft Jul 12</div>
+              {isPreDraft && !isDrafting && (
+                <div className="text-small text-muted font-medium mt-1">
+                  Draft {DRAFT_DATE_DISPLAY}
+                </div>
+              )}
+              {isDrafting && (
+                <div className="text-small text-gold font-semibold mt-1">Live now →</div>
+              )}
             </Card>
           </div>
 
