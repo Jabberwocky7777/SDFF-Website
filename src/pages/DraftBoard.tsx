@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { useDraftData, type EnrichedPlayer } from '@/hooks/useDraftData'
+import { useDraftData, type EnrichedPlayer, type DynastyProfile } from '@/hooks/useDraftData'
 import { parseFlockCsv } from '@/lib/parseFlockCsv'
 import { apiFetch } from '@/api/client'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
@@ -14,12 +14,27 @@ const POS_COLORS: Record<string, string> = {
   TE: 'bg-yellow-900/40 text-yellow-300 border border-yellow-500/30',
 }
 
+const TIER_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  S: { text: 'text-yellow-300',  bg: 'bg-yellow-900/20',  border: 'border-yellow-500/40' },
+  A: { text: 'text-emerald-300', bg: 'bg-emerald-900/20', border: 'border-emerald-500/40' },
+  B: { text: 'text-blue-300',    bg: 'bg-blue-900/20',    border: 'border-blue-500/40' },
+  C: { text: 'text-purple-300',  bg: 'bg-purple-900/20',  border: 'border-purple-500/40' },
+  D: { text: 'text-orange-300',  bg: 'bg-orange-900/20',  border: 'border-orange-500/40' },
+  E: { text: 'text-red-300',     bg: 'bg-red-900/20',     border: 'border-red-500/40' },
+  F: { text: 'text-rose-400',    bg: 'bg-rose-900/20',    border: 'border-rose-500/40' },
+  G: { text: 'text-zinc-400',    bg: 'bg-zinc-800/40',    border: 'border-zinc-600/40' },
+}
+const TIER_COLOR_DEFAULT = { text: 'text-zinc-400', bg: 'bg-zinc-800/40', border: 'border-zinc-600/40' }
+
+// Positional roster targets derived from the 34-man SF roster (QB×4, RB×9, WR×12, TE×3)
+const ROSTER_TARGETS: Record<Position, number> = { QB: 4, RB: 9, WR: 12, TE: 3 }
+
 const POSITIONS: Position[] = ['QB', 'RB', 'WR', 'TE']
 
-const LS_LIVE    = 'sdff_live_draft_id'
-const LS_MOCK    = 'sdff_mock_draft_id'
+const LS_LIVE     = 'sdff_live_draft_id'
+const LS_MOCK     = 'sdff_mock_draft_id'
 const LS_FLOCK_TS = 'sdff_flock_updated_at'
-const LS_ROSTER  = 'sdff_my_roster_id'
+const LS_ROSTER   = 'sdff_my_roster_id'
 
 type View     = 'value' | 'board' | 'drafted' | 'mine'
 type PosFilter = 'ALL' | Position
@@ -31,6 +46,21 @@ function PosBadge({ pos }: { pos: string }) {
   return (
     <span className={`text-label font-bold px-1.5 py-0.5 rounded shrink-0 ${POS_COLORS[pos] ?? 'bg-zinc-800 text-zinc-300 border border-zinc-600/30'}`}>
       {pos}
+    </span>
+  )
+}
+
+function ProfileBadge({ profile }: { profile: DynastyProfile | null }) {
+  if (!profile) return null
+  const cfg: Record<DynastyProfile, { label: string; cls: string }> = {
+    rebuild:  { label: '↑ Rebuild',  cls: 'bg-blue-900/40 text-blue-300 border-blue-500/30' },
+    balanced: { label: '~ Balanced', cls: 'bg-amber-900/30 text-amber-300 border-amber-500/30' },
+    allin:    { label: '↓ Win Now',  cls: 'bg-orange-900/40 text-orange-300 border-orange-500/30' },
+  }
+  const { label, cls } = cfg[profile]
+  return (
+    <span className={`text-[10px] font-semibold px-1 py-px rounded border leading-none ${cls}`}>
+      {label}
     </span>
   )
 }
@@ -74,10 +104,10 @@ function StatusPill({ status }: { status: string | null }) {
 type UploadState = 'idle' | 'ready' | 'uploading' | 'success' | 'error'
 
 function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUploaded: () => void }) {
-  const [dragOver, setDragOver]     = useState(false)
+  const [dragOver, setDragOver]       = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
-  const [uploadMsg, setUploadMsg]   = useState('')
-  const [preview, setPreview]       = useState<{ count: number; csv: string } | null>(null)
+  const [uploadMsg, setUploadMsg]     = useState('')
+  const [preview, setPreview]         = useState<{ count: number; csv: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const lastUpdated = localStorage.getItem(LS_FLOCK_TS)
@@ -208,11 +238,12 @@ export default function DraftBoard() {
   const [rosterInput, setRosterInput] = useState(myRosterId != null ? String(myRosterId) : '')
   const [configOpen,  setConfigOpen]  = useState(false)
 
-  const [view,      setViewState] = useState<View>('value')
-  const [posFilter, setPosFilter] = useState<PosFilter>('ALL')
-  const [sortKey,   setSortKey]   = useState<SortKey>('flockValue')
-  const [sortDir,   setSortDir]   = useState<'asc' | 'desc'>('desc')
-  const [search,    setSearch]    = useState('')
+  const [view,        setViewState]   = useState<View>('value')
+  const [posFilter,   setPosFilter]   = useState<PosFilter>('ALL')
+  const [sortKey,     setSortKey]     = useState<SortKey>('flockValue')
+  const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('desc')
+  const [search,      setSearch]      = useState('')
+  const [needsToggle, setNeedsToggle] = useState(false)
 
   const { players, recentPicks, currentPickNo, draftStatus, totalPicks, lastRefresh, isLoading, error, refresh, reloadFlockRankings } =
     useDraftData({ liveDraftId, mockDraftId })
@@ -246,6 +277,35 @@ export default function DraftBoard() {
     }
   }
 
+  // ── Positional need ─────────────────────────────────────────────────────────
+
+  // Count picks already made by the user's roster
+  const myCounts = useMemo<Record<Position, number>>(() => {
+    const counts: Record<Position, number> = { QB: 0, RB: 0, WR: 0, TE: 0 }
+    if (myRosterId == null) return counts
+    for (const p of players) {
+      if (!p.available && p.draftedByRosterId === myRosterId) {
+        counts[p.position]++
+      }
+    }
+    return counts
+  }, [players, myRosterId])
+
+  // How many picks ahead/behind target for each position
+  const needBonusFor = useCallback((pos: Position): number => {
+    if (!needsToggle || myRosterId == null) return 0
+    const target = ROSTER_TARGETS[pos]
+    const have   = myCounts[pos]
+    const deficit  = Math.max(0, target - have)
+    const surplus  = Math.max(0, have - target)
+    return deficit * 1.0 - surplus * 2.0
+  }, [myCounts, needsToggle, myRosterId])
+
+  // Effective sort value: raw flock value adjusted for positional need
+  const effectiveValue = useCallback((p: EnrichedPlayer): number => {
+    return p.flockValue + needBonusFor(p.position)
+  }, [needBonusFor])
+
   // ── Sorting ─────────────────────────────────────────────────────────────────
 
   const handleSort = (key: SortKey, defaultDir: 'asc' | 'desc' = 'desc') => {
@@ -261,9 +321,9 @@ export default function DraftBoard() {
   // Auto-sort when switching views
   const setView = (v: View) => {
     setViewState(v)
-    if (v === 'board')   { setSortKey('flockRank');   setSortDir('asc') }
-    else if (v === 'drafted' || v === 'mine') { setSortKey('wentAt'); setSortDir('asc') }
-    else                 { setSortKey('flockValue');  setSortDir('desc') }
+    if (v === 'board')                          { setSortKey('flockRank');  setSortDir('asc') }
+    else if (v === 'drafted' || v === 'mine')   { setSortKey('wentAt');    setSortDir('asc') }
+    else                                        { setSortKey('flockValue'); setSortDir('desc') }
   }
 
   // ── Filtered + sorted list ──────────────────────────────────────────────────
@@ -271,7 +331,7 @@ export default function DraftBoard() {
   const filtered = useMemo<EnrichedPlayer[]>(() => {
     let list = players
 
-    if (view === 'value')   list = list.filter((p) => p.available && p.flockValue >= -10)
+    if (view === 'value')        list = list.filter((p) => p.available && p.flockValue >= -10)
     else if (view === 'board')   list = list.filter((p) => p.available)
     else if (view === 'drafted') list = list.filter((p) => !p.available)
     else if (view === 'mine')    list = list.filter((p) => !p.available && p.draftedByRosterId === myRosterId)
@@ -286,32 +346,67 @@ export default function DraftBoard() {
     return [...list].sort((a, b) => {
       let av: number, bv: number
       switch (sortKey) {
-        case 'flockValue':        av = a.flockValue;             bv = b.flockValue;             break
-        case 'mockAdpValue':      av = a.mockAdpValue ?? -9999;  bv = b.mockAdpValue ?? -9999;  break
-        case 'flockRank':         av = a.flockRank;              bv = b.flockRank;              break
-        case 'mockAdp':           av = a.mockAdp ?? 9999;        bv = b.mockAdp ?? 9999;        break
-        case 'sleeperSearchRank': av = a.sleeperSearchRank;      bv = b.sleeperSearchRank;      break
-        case 'wentAt':            av = a.wentAt ?? 9999;         bv = b.wentAt ?? 9999;         break
+        case 'flockValue':
+          // When needs toggle is on, sort by need-adjusted value
+          av = effectiveValue(a); bv = effectiveValue(b); break
+        case 'mockAdpValue':      av = a.mockAdpValue ?? -9999;  bv = b.mockAdpValue ?? -9999; break
+        case 'flockRank':         av = a.flockRank;              bv = b.flockRank;             break
+        case 'mockAdp':           av = a.mockAdp ?? 9999;        bv = b.mockAdp ?? 9999;       break
+        case 'sleeperSearchRank': av = a.sleeperSearchRank;      bv = b.sleeperSearchRank;     break
+        case 'wentAt':            av = a.wentAt ?? 9999;         bv = b.wentAt ?? 9999;        break
       }
       return sortDir === 'asc' ? av - bv : bv - av
     })
-  }, [players, view, posFilter, search, sortKey, sortDir, myRosterId])
+  }, [players, view, posFilter, search, sortKey, sortDir, myRosterId, effectiveValue])
+
+  // ── Tier-aware row items ─────────────────────────────────────────────────────
+  // Only inject tier dividers when sorted by flockRank ascending (rank order is meaningful)
+
+  type RowItem =
+    | { type: 'player'; player: EnrichedPlayer; idx: number; isLastInTier: boolean }
+    | { type: 'divider'; tier: string }
+
+  const rowItems = useMemo<RowItem[]>(() => {
+    const showTiers = sortKey === 'flockRank' && sortDir === 'asc'
+    if (!showTiers) {
+      return filtered.map((player, idx) => ({ type: 'player', player, idx, isLastInTier: false }))
+    }
+
+    const items: RowItem[] = []
+    let lastTier: string | null = null
+
+    filtered.forEach((player, idx) => {
+      const tier = player.tier ?? null
+      if (tier && tier !== lastTier) {
+        items.push({ type: 'divider', tier })
+        lastTier = tier
+      }
+      const nextTier = filtered[idx + 1]?.tier ?? null
+      const isLastInTier = !!tier && (idx === filtered.length - 1 || nextTier !== tier)
+      items.push({ type: 'player', player, idx, isLastInTier })
+    })
+
+    return items
+  }, [filtered, sortKey, sortDir])
 
   // ── Sidebar data ────────────────────────────────────────────────────────────
 
   const bestValueByPos = useMemo(() =>
-    POSITIONS.map((pos) => ({
-      pos,
-      top3: players
+    POSITIONS.map((pos) => {
+      const bonus = needBonusFor(pos)
+      const top3 = players
         .filter((p) => p.position === pos && p.available)
-        .sort((a, b) => b.flockValue - a.flockValue)
-        .slice(0, 3),
-    })),
-  [players])
+        .sort((a, b) => effectiveValue(b) - effectiveValue(a))
+        .slice(0, 3)
+      return { pos, top3, bonus }
+    }),
+  [players, effectiveValue, needBonusFor])
 
   const availableCount = useMemo(() => players.filter((p) => p.available).length, [players])
+  const isDraftedView  = view === 'drafted' || view === 'mine'
 
-  const isDraftedView = view === 'drafted' || view === 'mine'
+  // Column count for colSpan in tier dividers / empty state
+  const colCount = isDraftedView ? 10 : 9
 
   // ── Loading / fatal ─────────────────────────────────────────────────────────
 
@@ -393,7 +488,7 @@ export default function DraftBoard() {
             </div>
             <div>
               <label className="block text-label text-muted uppercase font-semibold mb-1 tracking-wide">
-                My Roster # <span title="Your draft slot / roster number (1–12). Used for the My Team filter." className="text-mutedLow cursor-help">?</span>
+                My Roster # <span title="Your draft slot / roster number (1–12). Used for the My Team filter and positional need." className="text-mutedLow cursor-help">?</span>
               </label>
               <div className="flex gap-2">
                 <input type="number" min={1} max={12} value={rosterInput}
@@ -414,6 +509,7 @@ export default function DraftBoard() {
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
+        {/* View tabs */}
         <div className="flex gap-1">
           {([['value', '🎯 Value'], ['board', '📋 Board'], ['drafted', '✓ Drafted'], ['mine', '⭐ My Team']] as const).map(([v, label]) => (
             <button key={v} onClick={() => setView(v)}
@@ -423,6 +519,8 @@ export default function DraftBoard() {
             >{label}</button>
           ))}
         </div>
+
+        {/* Position filters */}
         <div className="flex gap-1">
           {(['ALL', ...POSITIONS] as PosFilter[]).map((pos) => (
             <button key={pos} onClick={() => setPosFilter(pos)}
@@ -432,6 +530,23 @@ export default function DraftBoard() {
             >{pos}</button>
           ))}
         </div>
+
+        {/* Positional need toggle — only useful when roster is set */}
+        {myRosterId != null && (
+          <button
+            onClick={() => setNeedsToggle((t) => !t)}
+            title={needsToggle ? 'Positional need ON — rankings adjusted for your roster' : 'Positional need OFF — click to adjust rankings for your roster needs'}
+            className={`px-2.5 py-1.5 text-label font-semibold rounded border transition-all ${
+              needsToggle
+                ? 'bg-gold/20 text-gold border-gold/40'
+                : 'bg-surfaceHi text-muted border-borderLow hover:text-text'
+            }`}
+          >
+            {needsToggle ? '⚡ Need ON' : '⚡ Need'}
+          </button>
+        )}
+
+        {/* Sort */}
         <select
           value={`${sortKey}:${sortDir}`}
           onChange={(e) => { const [k, d] = e.target.value.split(':') as [SortKey, 'asc' | 'desc']; setSortKey(k); setSortDir(d) }}
@@ -444,10 +559,39 @@ export default function DraftBoard() {
           <option value="sleeperSearchRank:asc">Sleeper ↑</option>
           {isDraftedView && <option value="wentAt:asc">Pick Order ↑</option>}
         </select>
+
+        {/* Search */}
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Search player or team…"
           className="flex-1 min-w-[160px] bg-surfaceHi border border-borderLow rounded px-3 py-1.5 text-small text-text placeholder-mutedLow focus:outline-none focus:border-gold/50" />
       </div>
+
+      {/* Positional need summary (shown when toggle is active) */}
+      {needsToggle && myRosterId != null && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {POSITIONS.map((pos) => {
+            const have   = myCounts[pos]
+            const target = ROSTER_TARGETS[pos]
+            const diff   = have - target
+            const isOver  = diff > 0
+            const isUnder = diff < 0
+            return (
+              <div key={pos}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label border ${
+                  isOver  ? 'bg-red-900/20 text-red-300 border-red-500/30' :
+                  isUnder ? 'bg-emerald-900/20 text-emerald-300 border-emerald-500/30' :
+                            'bg-zinc-800/40 text-zinc-400 border-zinc-600/30'
+                }`}
+              >
+                <PosBadge pos={pos} />
+                <span className="font-mono font-semibold">{have}/{target}</span>
+                {isOver  && <span>+{diff} surplus</span>}
+                {isUnder && <span>{diff} needed</span>}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* "My Team" with no roster set */}
       {view === 'mine' && myRosterId == null && (
@@ -462,7 +606,7 @@ export default function DraftBoard() {
         {/* ── Table ──────────────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
           <div className="overflow-x-auto bg-surface border border-borderLow rounded-lg">
-            <table className="w-full text-small border-collapse" style={{ minWidth: isDraftedView ? 520 : 620 }}>
+            <table className="w-full text-small border-collapse" style={{ minWidth: isDraftedView ? 560 : 660 }}>
               <thead>
                 <tr className="bg-surfaceHi border-b border-borderLow text-label text-muted uppercase tracking-wide">
                   <th className="px-3 py-2.5 text-left font-semibold w-8">#</th>
@@ -485,7 +629,7 @@ export default function DraftBoard() {
                   )}
                   <th className="px-3 py-2.5 text-center font-semibold w-20 cursor-pointer hover:text-text whitespace-nowrap"
                     onClick={() => handleSort('flockValue', 'desc')}>
-                    vs Flock {sortIndicator('flockValue')}
+                    {needsToggle ? 'vs Flock*' : 'vs Flock'} {sortIndicator('flockValue')}
                   </th>
                   <th className="px-3 py-2.5 text-center font-semibold w-16 cursor-pointer hover:text-text whitespace-nowrap"
                     onClick={() => handleSort('mockAdpValue', 'desc')}>
@@ -494,31 +638,65 @@ export default function DraftBoard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {rowItems.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-muted">
+                    <td colSpan={colCount} className="px-4 py-10 text-center text-muted">
                       No players match the current filters
                     </td>
                   </tr>
-                ) : filtered.map((p, i) => {
+                ) : rowItems.map((item, itemIdx) => {
+
+                  // ── Tier divider row ──────────────────────────────────
+                  if (item.type === 'divider') {
+                    const tc = TIER_COLORS[item.tier] ?? TIER_COLOR_DEFAULT
+                    return (
+                      <tr key={`divider-${item.tier}-${itemIdx}`} className="border-b border-borderLow">
+                        <td colSpan={colCount} className="px-3 py-1">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-px bg-borderLow" />
+                            <span className={`text-label font-bold px-2.5 py-0.5 rounded border ${tc.bg} ${tc.text} ${tc.border}`}>
+                              Tier {item.tier}
+                            </span>
+                            <div className="flex-1 h-px bg-borderLow" />
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  // ── Player row ────────────────────────────────────────
+                  const { player: p, idx: i, isLastInTier } = item
+                  const effVal = effectiveValue(p)
                   const rowHighlight =
-                    p.available && p.flockValue >= 20 ? 'bg-emerald-900/25' :
-                    p.available && p.flockValue >= 10 ? 'bg-emerald-900/10' : ''
+                    p.available && effVal >= 20 ? 'bg-emerald-900/25' :
+                    p.available && effVal >= 10 ? 'bg-emerald-900/10' : ''
                   const namePrefix =
-                    p.available && p.flockValue >= 20 ? '🔥 ' :
-                    p.available && p.flockValue >= 10 ? '⚡ ' : ''
+                    p.available && effVal >= 20 ? '🔥 ' :
+                    p.available && effVal >= 10 ? '⚡ ' : ''
                   const isMyPick = p.draftedByRosterId === myRosterId && !p.available
+
+                  // Tier color for "last of tier" border hint
+                  const tc = p.tier ? (TIER_COLORS[p.tier] ?? TIER_COLOR_DEFAULT) : null
 
                   return (
                     <tr key={p.name + p.team}
-                      className={`border-b border-borderLow last:border-0 hover:bg-white/3 transition-colors ${rowHighlight} ${!p.available && view !== 'mine' && view !== 'drafted' ? 'opacity-40' : ''} ${isMyPick && view !== 'mine' ? 'bg-gold/5' : ''}`}
+                      className={[
+                        'border-b border-borderLow last:border-0 hover:bg-white/3 transition-colors',
+                        rowHighlight,
+                        !p.available && view !== 'mine' && view !== 'drafted' ? 'opacity-40' : '',
+                        isMyPick && view !== 'mine' ? 'bg-gold/5' : '',
+                        isLastInTier && tc ? `border-b-2 ${tc.border}` : '',
+                      ].filter(Boolean).join(' ')}
                     >
                       <td className="px-3 py-2 font-mono text-mutedLow">{i + 1}</td>
-                      <td className="px-3 py-2 max-w-[180px]">
+                      <td className="px-3 py-2 max-w-[200px]">
                         <span className={`text-text font-semibold truncate block ${!p.available ? 'line-through opacity-60' : ''}`}
                           title={p.name}>
                           {namePrefix}{p.name}
                         </span>
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          {p.dynastyProfile && <ProfileBadge profile={p.dynastyProfile} />}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-center"><PosBadge pos={p.position} /></td>
                       <td className="px-3 py-2 text-center font-mono text-muted">{p.team || '—'}</td>
@@ -529,7 +707,12 @@ export default function DraftBoard() {
                           {p.wentAt != null ? `#${p.wentAt}` : '—'}
                         </td>
                       )}
-                      <td className="px-3 py-2 text-center"><ValueCell value={p.flockValue} /></td>
+                      <td className="px-3 py-2 text-center">
+                        {needsToggle
+                          ? <ValueCell value={Math.round(effVal * 100) / 100} />
+                          : <ValueCell value={p.flockValue} />
+                        }
+                      </td>
                       <td className="px-3 py-2 text-center"><ValueCell value={p.mockAdpValue} /></td>
                     </tr>
                   )
@@ -541,30 +724,42 @@ export default function DraftBoard() {
             {filtered.length} player{filtered.length !== 1 ? 's' : ''}
             {posFilter !== 'ALL' ? ` · ${posFilter}` : ''}
             {search ? ` · "${search}"` : ''}
+            {needsToggle ? ' · ⚡ need-adjusted' : ''}
           </p>
         </div>
 
         {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
-        <div className="hidden lg:flex flex-col gap-5 w-60 shrink-0">
+        <div className="hidden lg:flex flex-col gap-5 w-64 shrink-0">
 
           <div className="bg-surface border border-borderLow rounded-lg overflow-hidden">
-            <div className="bg-surfaceHi border-b border-borderLow px-4 py-2.5">
+            <div className="bg-surfaceHi border-b border-borderLow px-4 py-2.5 flex items-center justify-between">
               <div className="text-label uppercase font-bold text-muted tracking-wide">Best Value</div>
+              {needsToggle && <span className="text-[10px] text-gold font-semibold">⚡ need-adjusted</span>}
             </div>
             <div className="p-3 space-y-3">
-              {bestValueByPos.map(({ pos, top3 }) => (
-                <div key={pos}>
-                  <div className="mb-1"><PosBadge pos={pos} /></div>
-                  {top3.length === 0 ? (
-                    <p className="text-label text-mutedLow pl-1">None fallen yet</p>
-                  ) : top3.map((p) => (
-                    <div key={p.name} className="flex items-center gap-1 py-0.5">
-                      <span className="text-small text-text truncate flex-1 min-w-0" title={p.name}>{p.name}</span>
-                      <span className="shrink-0 ml-1"><ValueCell value={p.flockValue} /></span>
+              {bestValueByPos.map(({ pos, top3, bonus }) => {
+                const isNeeded   = needsToggle && bonus > 0
+                const isSurplus  = needsToggle && bonus < 0
+                return (
+                  <div key={pos}>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <PosBadge pos={pos} />
+                      {isNeeded  && <span className="text-[10px] text-emerald-400 font-semibold">need {myCounts[pos]}/{ROSTER_TARGETS[pos]}</span>}
+                      {isSurplus && <span className="text-[10px] text-red-400 font-semibold">surplus {myCounts[pos]}/{ROSTER_TARGETS[pos]}</span>}
                     </div>
-                  ))}
-                </div>
-              ))}
+                    {top3.length === 0 ? (
+                      <p className="text-label text-mutedLow pl-1">None fallen yet</p>
+                    ) : top3.map((p) => (
+                      <div key={p.name} className="flex items-center gap-1 py-0.5">
+                        <span className="text-small text-text truncate flex-1 min-w-0" title={p.name}>{p.name}</span>
+                        <span className="shrink-0 ml-1">
+                          <ValueCell value={needsToggle ? Math.round(effectiveValue(p) * 100) / 100 : p.flockValue} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -589,7 +784,12 @@ export default function DraftBoard() {
                     <div className="flex-1 min-w-0">
                       <div className="text-small text-text truncate" title={name}>{name}</div>
                       {flockEntry && (
-                        <div className="text-label text-mutedLow">Flock #{flockEntry.flockRank}</div>
+                        <div className="text-label text-mutedLow">
+                          Flock #{flockEntry.flockRank}
+                          {flockEntry.dynastyProfile && (
+                            <span className="ml-1.5"><ProfileBadge profile={flockEntry.dynastyProfile} /></span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

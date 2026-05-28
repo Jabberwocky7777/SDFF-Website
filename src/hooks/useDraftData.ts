@@ -9,6 +9,8 @@ import type { SleeperDraftPick } from '@/hooks/useDraftPicks'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export type DynastyProfile = 'rebuild' | 'balanced' | 'allin'
+
 export interface EnrichedPlayer {
   name: string
   playerId: string | null
@@ -23,6 +25,8 @@ export interface EnrichedPlayer {
   draftedByRosterId: number | null
   flockValue: number
   mockAdpValue: number | null
+  dynastyProfile: DynastyProfile | null
+  tier: string | null
 }
 
 interface SleeperDraftMeta {
@@ -34,6 +38,18 @@ interface SleeperDraftMeta {
     rounds: number
   }
   league_id: string
+}
+
+// ── Dynasty profile helper ────────────────────────────────────────────────────
+
+function computeDynastyProfile(pos: Position, age: number | null): DynastyProfile | null {
+  if (age == null) return null
+  switch (pos) {
+    case 'QB': return age < 24 ? 'rebuild' : age <= 29 ? 'balanced' : 'allin'
+    case 'RB': return age < 22 ? 'rebuild' : age <= 26 ? 'balanced' : 'allin'
+    case 'WR': return age < 23 ? 'rebuild' : age <= 27 ? 'balanced' : 'allin'
+    case 'TE': return age < 24 ? 'rebuild' : age <= 28 ? 'balanced' : 'allin'
+  }
 }
 
 // ── Text fetch helper ─────────────────────────────────────────────────────────
@@ -171,8 +187,9 @@ export function useDraftData({
       const wentAt = playerId != null ? (wentAtMap.get(playerId) ?? null) : null
       const draftedByRosterId = playerId != null ? (rosterIdMap.get(playerId) ?? null) : null
       const mockAdp = playerId != null ? (mockAdpMap.get(playerId) ?? null) : null
-      const sleeperSearchRank =
-        playerId != null ? (playersMap?.[playerId]?.search_rank ?? 9999) : 9999
+      const sleeperPlayer = playerId != null ? playersMap?.[playerId] : null
+      const sleeperSearchRank = sleeperPlayer?.search_rank ?? 9999
+      const age = sleeperPlayer?.age ?? null
 
       const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -190,6 +207,8 @@ export function useDraftData({
         draftedByRosterId,
         flockValue: round2(currentPickNo - fp.expertRank),
         mockAdpValue: mockAdp != null ? round2(currentPickNo - mockAdp) : null,
+        dynastyProfile: computeDynastyProfile(fp.position, age),
+        tier: fp.tier,
       }
     })
   }, [flockQuery.data, livePicksQuery.data, mockPicksQuery.data, playersMap])

@@ -5,6 +5,19 @@ export interface FlockPlayer {
   team: string
   position: Position
   expertRank: number
+  tier: string | null
+}
+
+function inferTier(rank: number): string {
+  const r = Math.floor(rank)
+  if (r <= 8)   return 'S'
+  if (r <= 20)  return 'A'
+  if (r <= 36)  return 'B'
+  if (r <= 60)  return 'C'
+  if (r <= 84)  return 'D'
+  if (r <= 120) return 'E'
+  if (r <= 160) return 'F'
+  return 'G'
 }
 
 const VALID_POSITIONS = new Set<string>(['QB', 'RB', 'WR', 'TE'])
@@ -34,6 +47,7 @@ export function parseFlockCsv(raw: string): FlockPlayer[] {
   const teamIdx = headerCols.indexOf('team')
   const posIdx = headerCols.indexOf('position')
   const rankIdx = headerCols.indexOf('expert rank')
+  const tierIdx = headerCols.indexOf('tier')
 
   if (nameIdx === -1) throw new Error('CSV is missing a "Name" column.')
   if (rankIdx === -1) throw new Error('CSV is missing an "Expert Rank" column.')
@@ -53,11 +67,15 @@ export function parseFlockCsv(raw: string): FlockPlayer[] {
     const expertRank = parseFloat(rankStr)
     if (isNaN(expertRank)) continue
 
+    const tierRaw = tierIdx >= 0 ? (cols[tierIdx]?.trim() ?? '') : ''
+    const tier = tierRaw ? tierRaw.toUpperCase() : inferTier(expertRank)
+
     players.push({
       name,
       team,
       position: rawPos as Position,
       expertRank,
+      tier,
     })
   }
 
