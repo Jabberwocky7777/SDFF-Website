@@ -20,6 +20,7 @@ export interface EnrichedPlayer {
   currentPickNo: number
   available: boolean
   wentAt: number | null
+  draftedByRosterId: number | null
   flockValue: number
   mockAdpValue: number | null
 }
@@ -101,11 +102,11 @@ export function useDraftData({
     enabled: !!liveDraftId,
   })
 
-  // Live draft picks (30s poll — critical for real-time availability)
+  // Live draft picks (15s TTL — matches server cache so manual refresh always gets fresh data)
   const livePicksQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'picks'],
     queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft/${liveDraftId}/picks`),
-    staleTime: 30_000,
+    staleTime: 15_000,
     refetchInterval: pollIntervalMs,
     enabled: !!liveDraftId,
   })
@@ -147,12 +148,14 @@ export function useDraftData({
       mockAdpMap.set(pick.player_id, pick.pick_no)
     }
 
-    // Build drafted set + wentAt map
+    // Build drafted set + wentAt + rosterIdBy maps
     const draftedSet = new Set<string>()
     const wentAtMap = new Map<string, number>()
+    const rosterIdMap = new Map<string, number>()
     for (const pick of livePicks) {
       draftedSet.add(pick.player_id)
       wentAtMap.set(pick.player_id, pick.pick_no)
+      rosterIdMap.set(pick.player_id, pick.roster_id)
     }
 
     return flockPlayers.map((fp) => {
@@ -166,9 +169,12 @@ export function useDraftData({
 
       const available = playerId != null ? !draftedSet.has(playerId) : true
       const wentAt = playerId != null ? (wentAtMap.get(playerId) ?? null) : null
+      const draftedByRosterId = playerId != null ? (rosterIdMap.get(playerId) ?? null) : null
       const mockAdp = playerId != null ? (mockAdpMap.get(playerId) ?? null) : null
       const sleeperSearchRank =
         playerId != null ? (playersMap?.[playerId]?.search_rank ?? 9999) : 9999
+
+      const round2 = (n: number) => Math.round(n * 100) / 100
 
       return {
         name: fp.name,
@@ -181,8 +187,9 @@ export function useDraftData({
         currentPickNo,
         available,
         wentAt,
-        flockValue: currentPickNo - fp.expertRank,
-        mockAdpValue: mockAdp != null ? currentPickNo - mockAdp : null,
+        draftedByRosterId,
+        flockValue: round2(currentPickNo - fp.expertRank),
+        mockAdpValue: mockAdp != null ? round2(currentPickNo - mockAdp) : null,
       }
     })
   }, [flockQuery.data, livePicksQuery.data, mockPicksQuery.data, playersMap])

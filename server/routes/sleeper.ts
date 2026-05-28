@@ -111,7 +111,7 @@ router.get('/league/draft-id', async (req, res) => {
 // ── Draft picks (short TTL — live during draft) ───────────────────────────────
 router.get('/draft/:draftId/picks', (req, res) => {
   const { draftId } = req.params
-  void cached(req, res, `draft_picks_${draftId}`, `${SLEEPER_BASE}/draft/${draftId}/picks`, 30)
+  void cached(req, res, `draft_picks_${draftId}`, `${SLEEPER_BASE}/draft/${draftId}/picks`, 15)
 })
 
 // ── FantasyCalc dynasty rankings ─────────────────────────────────────────────
