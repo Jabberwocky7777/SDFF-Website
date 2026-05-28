@@ -86,6 +86,7 @@ export interface SleeperPlayer {
   birth_date: string | null
   years_exp: number
   status: string
+  search_rank?: number
   injury_status: string | null
   depth_chart_position: number | null
   depth_chart_order: number | null
