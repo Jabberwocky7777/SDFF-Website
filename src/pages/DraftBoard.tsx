@@ -245,7 +245,7 @@ export default function DraftBoard() {
   const [search,      setSearch]      = useState('')
   const [needsToggle, setNeedsToggle] = useState(false)
 
-  const { players, recentPicks, currentPickNo, draftStatus, totalPicks, lastRefresh, isLoading, error, refresh, reloadFlockRankings } =
+  const { players, recentPicks, currentPickNo, draftStatus, totalPicks, lastRefresh, isLoading, isFetching, error, refresh, reloadFlockRankings } =
     useDraftData({ liveDraftId, mockDraftId })
 
   // ── Countdown ───────────────────────────────────────────────────────────────
@@ -435,8 +435,21 @@ export default function DraftBoard() {
           <span className="text-small text-muted">{availableCount} available</span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {liveDraftId && <span className="text-label text-mutedLow">↻ in {countdown}s</span>}
-          <button onClick={refresh} title="Refresh now" className="text-mutedLow hover:text-gold transition-colors text-base">↻</button>
+          {liveDraftId && !isFetching && (
+            <span className="text-label text-mutedLow">↻ in {countdown}s</span>
+          )}
+          {isFetching && (
+            <span className="text-label text-gold flex items-center gap-1">
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              syncing…
+            </span>
+          )}
+          <button onClick={refresh} title="Refresh now"
+            className={`transition-colors text-base ${isFetching ? 'text-gold animate-spin' : 'text-mutedLow hover:text-gold'}`}
+          >↻</button>
           <button
             onClick={() => setConfigOpen((o) => !o)}
             title="Settings"
@@ -488,7 +501,7 @@ export default function DraftBoard() {
             </div>
             <div>
               <label className="block text-label text-muted uppercase font-semibold mb-1 tracking-wide">
-                My Roster # <span title="Your draft slot / roster number (1–12). Used for the My Team filter and positional need." className="text-mutedLow cursor-help">?</span>
+                My Draft Slot <span title="Your pick position in the draft (1–12). Works for both live and mock drafts." className="text-mutedLow cursor-help">?</span>
               </label>
               <div className="flex gap-2">
                 <input type="number" min={1} max={12} value={rosterInput}
@@ -499,7 +512,7 @@ export default function DraftBoard() {
                 <button onClick={applyRosterId} className="px-3 py-1.5 bg-gold text-[#1A1100] text-small font-bold rounded hover:bg-gold/90">Set</button>
               </div>
               {myRosterId != null && (
-                <p className="text-label text-mutedLow mt-1">Currently tracking roster #{myRosterId}</p>
+                <p className="text-label text-mutedLow mt-1">Tracking draft slot #{myRosterId}</p>
               )}
             </div>
           </div>

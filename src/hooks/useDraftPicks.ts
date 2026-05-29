@@ -3,7 +3,8 @@ import { apiFetch } from '@/api/client'
 
 export interface SleeperDraftPick {
   round: number
-  roster_id: number
+  roster_id: number      // league roster ID (0 in mock drafts — use draft_slot instead)
+  draft_slot: number     // pick order in the draft (1–N); reliable in both live and mock drafts
   player_id: string
   picked_by: string      // roster_id of the team that made the pick
   pick_no: number

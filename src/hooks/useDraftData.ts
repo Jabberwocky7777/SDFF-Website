@@ -164,14 +164,15 @@ export function useDraftData({
       mockAdpMap.set(pick.player_id, pick.pick_no)
     }
 
-    // Build drafted set + wentAt + rosterIdBy maps
+    // Build drafted set + wentAt + draftSlot maps
+    // Use draft_slot (not roster_id) — roster_id is 0 in mock drafts but draft_slot is always set
     const draftedSet = new Set<string>()
     const wentAtMap = new Map<string, number>()
     const rosterIdMap = new Map<string, number>()
     for (const pick of livePicks) {
       draftedSet.add(pick.player_id)
       wentAtMap.set(pick.player_id, pick.pick_no)
-      rosterIdMap.set(pick.player_id, pick.roster_id)
+      rosterIdMap.set(pick.player_id, pick.draft_slot)
     }
 
     return flockPlayers.map((fp) => {
@@ -229,6 +230,10 @@ export function useDraftData({
     flockQuery.isLoading ||
     (!!liveDraftId && (liveMetaQuery.isLoading || livePicksQuery.isLoading))
 
+  // True during any background refetch (after initial load) — use for spinner
+  const isFetching =
+    (!!liveDraftId && livePicksQuery.isFetching && !livePicksQuery.isLoading)
+
   const error =
     flockQuery.error instanceof Error ? flockQuery.error.message :
     livePicksQuery.error instanceof Error ? livePicksQuery.error.message :
@@ -251,6 +256,7 @@ export function useDraftData({
     totalPicks,
     lastRefresh: livePicksQuery.dataUpdatedAt,
     isLoading,
+    isFetching,
     error,
     refresh,
     reloadFlockRankings,
