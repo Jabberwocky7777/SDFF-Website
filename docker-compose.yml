@@ -2,7 +2,7 @@ services:
   sdff-web:
     image: ghcr.io/jabberwocky7777/sdff-website:latest
     ports:
-      - "7780:7780"
+      - "7780:3001"    # host:container — server always listens on 3001 inside the container
     volumes:
       - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path
     env_file:
@@ -13,4 +13,4 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s

@@ -14,6 +14,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
+COPY --from=builder /app/server/data ./server/data
 RUN mkdir -p /app/cache && chown -R node:node /app/cache
 USER node
 EXPOSE 3001
