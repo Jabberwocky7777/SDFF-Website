@@ -30,7 +30,7 @@ export default function Timeline() {
   return (
     <div>
       <div className="mb-10">
-        <h1 className="font-sans text-hero font-bold text-text mb-2">League Timeline</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-2">League Timeline</h1>
         <p className="text-body text-muted leading-relaxed max-w-2xl">
           Key dates for the 2026 SDFF season and beyond. Past events are dimmed; the next upcoming event is highlighted.
         </p>

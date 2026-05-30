@@ -91,7 +91,7 @@ export default function Picks() {
   if (isLoading || !rosters || !users) {
     return (
       <div>
-        <h1 className="font-sans text-hero font-bold text-text mb-8">Traded Picks</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-8">Traded Picks</h1>
         <SkeletonLoader rows={8} />
       </div>
     )
@@ -100,7 +100,7 @@ export default function Picks() {
   if (isError) {
     return (
       <div>
-        <h1 className="font-sans text-hero font-bold text-text mb-4">Traded Picks</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-4">Traded Picks</h1>
         <div className="bg-surface border border-red-500/30 rounded-lg p-6 text-center">
           <p className="text-base text-muted mb-3">Failed to load traded picks.</p>
           <button
@@ -117,7 +117,7 @@ export default function Picks() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="font-sans text-hero font-bold text-text mb-2">Traded Picks</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-2">Traded Picks</h1>
         <p className="text-body text-muted leading-relaxed max-w-2xl">
           Future rookie pick ownership. Picks shown in gold have been traded. A ⚠ warning appears when
           dues for that season haven't been paid — both managers must pay before such picks can be traded.

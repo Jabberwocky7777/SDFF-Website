@@ -43,13 +43,13 @@ const DRAFT_DATE_DISPLAY = formatDraftDate(LEAGUE_CONFIG.draft.startupDraftDate)
 function PreDraftBanner({ isDrafting }: { isDrafting?: boolean }) {
   return (
     <div className="rounded-lg border border-borderLow bg-surface mb-10">
-      <div className="flex gap-8 items-start py-12 px-8">
-        <img src="/logo.svg" alt="" className="h-[120px] w-[120px] shrink-0 opacity-90" />
+      <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start py-8 px-5 sm:py-12 sm:px-8">
+        <img src="/logo.svg" alt="" className="h-20 w-20 sm:h-[120px] sm:w-[120px] shrink-0 opacity-90" />
         <div>
           <p className="text-label text-gold uppercase tracking-[0.06em] font-semibold mb-2">
             {isDrafting ? 'Draft in progress' : 'Pre-season'}
           </p>
-          <h1 className="text-hero font-bold text-text mb-3">
+          <h1 className="text-h1 sm:text-hero font-bold text-text mb-3">
             {isDrafting ? 'Startup draft underway' : 'Awaiting the startup draft'}
           </h1>
           <p className="text-body text-muted leading-relaxed max-w-xl mb-6">

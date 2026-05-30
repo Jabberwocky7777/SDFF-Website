@@ -10,7 +10,7 @@ const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 const CACHE_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
 
 const KTC_PAGE_URL = 'https://keeptradecut.com/dynasty-rankings'
-const FC_URL  = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&ppr=1'
+const FC_URL  = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&ppr=1&isSuperflex=true&tep=1'
 const FLOCK_FILE = path.join(CACHE_DIR, 'flock-rankings.csv')
 const FLOCK_DEFAULT = path.join(process.cwd(), 'server', 'data', 'flock-rankings-default.csv')
 
@@ -52,7 +52,7 @@ async function fetchKtcRankings(): Promise<unknown> {
     playerName: string
     position: string
     team: string
-    oneQBValues?: { tep?: { rank?: number; value?: number } }
+    superflexValues?: { tep?: { rank?: number; value?: number } }
   }>
   return raw
     .filter((p) => ['QB', 'RB', 'WR', 'TE'].includes(p.position))
@@ -60,8 +60,8 @@ async function fetchKtcRankings(): Promise<unknown> {
       playerName: p.playerName,
       position:   p.position,
       team:       p.team,
-      overallRank: p.oneQBValues?.tep?.rank  ?? null,
-      value:       p.oneQBValues?.tep?.value ?? null,
+      overallRank: p.superflexValues?.tep?.rank  ?? null,
+      value:       p.superflexValues?.tep?.value ?? null,
     }))
     .filter((p) => p.overallRank != null)
 }

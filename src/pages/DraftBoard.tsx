@@ -398,7 +398,7 @@ export default function DraftBoard() {
   if (isLoading && players.length === 0) {
     return (
       <div>
-        <h1 className="font-sans text-hero font-bold text-text mb-6">SDFF Draft Board</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-6">SDFF Draft Board</h1>
         <SkeletonLoader rows={12} />
       </div>
     )
@@ -411,7 +411,7 @@ export default function DraftBoard() {
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h1 className="font-sans text-hero font-bold text-text">SDFF Draft Board</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text">SDFF Draft Board</h1>
         <StatusPill status={draftStatus} />
         {draftStatus === 'drafting' && (
           <span className="text-small text-muted font-mono">Pick {currentPickNo} / {totalPicks}</span>
@@ -496,7 +496,7 @@ export default function DraftBoard() {
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
         {/* View tabs */}
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {([
             ['available', '🎯 Available'],
             ['board',     '📋 Board'],
@@ -512,7 +512,7 @@ export default function DraftBoard() {
         </div>
 
         {/* Position filters */}
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {(['ALL', ...POSITIONS] as PosFilter[]).map((pos) => (
             <button key={pos} onClick={() => setPosFilter(pos)}
               className={`px-2.5 py-1.5 text-label font-semibold rounded transition-all ${

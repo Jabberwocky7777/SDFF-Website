@@ -46,7 +46,7 @@ export default function Dues() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="font-sans text-hero font-bold text-text mb-2">Dues & Payouts</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-2">Dues & Payouts</h1>
         <p className="text-body text-muted leading-relaxed max-w-2xl">
           Track annual dues, the Squad Pot jackpot, and the payout structure.
         </p>
@@ -62,9 +62,9 @@ export default function Dues() {
 
         <div className="bg-surface border border-borderLow rounded-lg overflow-x-auto">
           {/* Header */}
-          <div className="grid bg-surfaceHi border-b border-borderLow px-4 py-3"
+          <div className="grid bg-surfaceHi border-b border-borderLow px-4 py-3 min-w-[34rem]"
                style={{ gridTemplateColumns: `1fr repeat(${DUES_YEARS.length}, 6.5rem)` }}>
-            <div className="text-label text-muted uppercase tracking-[0.04em] font-semibold">Manager</div>
+            <div className="text-label text-muted uppercase tracking-[0.04em] font-semibold sticky left-0 z-10 bg-surfaceHi">Manager</div>
             {DUES_YEARS.map((year) => (
               <div key={year} className="text-label text-muted uppercase tracking-[0.04em] font-semibold text-center">
                 {year}
@@ -76,10 +76,10 @@ export default function Dues() {
           {sortedRecords.map((rec: DuesRecord) => (
             <div
               key={rec.managerName}
-              className="grid border-b border-borderLow last:border-0 px-4 py-3 hover:bg-white/3 transition-colors"
+              className="grid border-b border-borderLow last:border-0 px-4 py-3 hover:bg-white/3 transition-colors min-w-[34rem]"
               style={{ gridTemplateColumns: `1fr repeat(${DUES_YEARS.length}, 6.5rem)` }}
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 sticky left-0 z-10 bg-surface">
                 <span className="text-base font-semibold text-text truncate">{rec.managerName}</span>
                 {rec.role && <RoleBadge role={rec.role} />}
               </div>
@@ -130,11 +130,11 @@ export default function Dues() {
         </div>
 
         {/* Championship history */}
-        <div className="bg-surface border border-borderLow rounded-lg overflow-hidden mb-4">
+        <div className="bg-surface border border-borderLow rounded-lg overflow-x-auto mb-4">
           <div className="bg-surfaceHi border-b border-borderLow px-4 py-3">
             <div className="text-label text-muted uppercase tracking-[0.04em] font-semibold">Championship History</div>
           </div>
-          <div className="grid bg-surfaceHi border-b border-borderLow px-4 py-2"
+          <div className="grid bg-surfaceHi border-b border-borderLow px-4 py-2 min-w-[640px]"
                style={{ gridTemplateColumns: '4rem 1fr 1fr 1fr 1fr' }}>
             {['Year', 'Champion', 'Runner-Up', '3rd Place', 'Reg. Season Winner'].map((h) => (
               <div key={h} className="text-label text-muted uppercase tracking-[0.04em] font-semibold">{h}</div>
@@ -143,7 +143,7 @@ export default function Dues() {
           {championshipHistory.map((rec) => (
             <div
               key={rec.year}
-              className="grid border-b border-borderLow last:border-0 px-4 py-3"
+              className="grid border-b border-borderLow last:border-0 px-4 py-3 min-w-[640px]"
               style={{ gridTemplateColumns: '4rem 1fr 1fr 1fr 1fr' }}
             >
               <span className="font-mono text-num text-text">{rec.year}</span>

@@ -28,8 +28,9 @@ function StandingsTable({ standings }: { standings: TeamRecord[] }) {
     <>
       <div className="bg-surface border border-borderLow overflow-hidden rounded-lg">
         {/* Header */}
-        <div className="grid bg-surfaceHi border-b border-borderLow px-5 py-3.5"
-             style={{ gridTemplateColumns: '2.5rem 1fr 5rem 4rem 4rem 5rem 5rem 3.5rem' }}>
+        <div className="grid bg-surfaceHi border-b border-borderLow px-3 sm:px-5 py-3.5
+          grid-cols-[2.25rem_minmax(0,1fr)_4.25rem_3.75rem_3.75rem_3rem]
+          sm:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4rem_5rem_5rem_3.5rem]">
           {['#', 'Team', 'Combined', 'H2H', 'Median', 'PF', 'MPF', 'Luck'].map((h, i) => (
             <div key={h} className={`text-label text-muted uppercase tracking-[0.04em] font-semibold ${i > 1 ? 'text-center' : ''} ${i === 3 || i === 4 ? 'hidden sm:block' : ''}`}>
               {h}
@@ -45,10 +46,11 @@ function StandingsTable({ standings }: { standings: TeamRecord[] }) {
           return (
             <div
               key={team.rosterId}
-              className={`grid px-5 py-3 border-b border-borderLow last:border-0 transition-colors hover:bg-white/3 ${
-                inPlayoffs ? 'bg-goldLow' : isBottomSix ? 'bg-red-900/3' : ''
+              className={`grid px-3 sm:px-5 py-3 border-b border-borderLow last:border-0 transition-colors hover:bg-white/3
+                grid-cols-[2.25rem_minmax(0,1fr)_4.25rem_3.75rem_3.75rem_3rem]
+                sm:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4rem_5rem_5rem_3.5rem]
+                ${inPlayoffs ? 'bg-goldLow' : isBottomSix ? 'bg-red-900/3' : ''
               }`}
-              style={{ gridTemplateColumns: '2.5rem 1fr 5rem 4rem 4rem 5rem 5rem 3.5rem' }}
             >
               {/* Seed */}
               <div className="flex items-center">
@@ -228,7 +230,7 @@ export default function Standings() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="font-sans text-hero font-bold text-text mb-2">Standings</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-2">Standings</h1>
         <p className="text-body text-muted leading-relaxed max-w-2xl">
           Combined record = H2H wins + median wins. Seed 6 goes to the highest scorer outside the top 5.
         </p>

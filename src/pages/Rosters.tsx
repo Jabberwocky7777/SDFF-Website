@@ -216,7 +216,7 @@ export default function Rosters() {
             <>
               <div className="bg-surface border border-borderLow rounded-lg overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-surfaceHi border-b border-borderLow">
+                <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 bg-surfaceHi border-b border-borderLow">
                   <div className="w-8 shrink-0" />
                   <div className="text-label text-muted uppercase tracking-[0.04em] font-semibold w-40 shrink-0">Team</div>
                   <div className="text-label text-muted uppercase tracking-[0.04em] font-semibold flex-1">Age Distribution</div>

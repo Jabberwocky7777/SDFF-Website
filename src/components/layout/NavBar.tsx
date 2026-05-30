@@ -52,7 +52,7 @@ export default function NavBar() {
 
           {/* Mobile hamburger */}
           <button
-            className="sm:hidden text-muted hover:text-gold p-2 transition-colors"
+            className="sm:hidden text-muted hover:text-gold p-2.5 -mr-1 transition-colors"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
           >
