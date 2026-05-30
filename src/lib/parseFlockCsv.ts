@@ -24,6 +24,8 @@ const VALID_POSITIONS = new Set<string>(['QB', 'RB', 'WR', 'TE'])
 
 export function normalizePlayerName(name: string): string {
   return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     // Remove apostrophes (straight and curly)
     .replace(/['‘’]/g, '')

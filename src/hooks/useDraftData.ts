@@ -18,13 +18,17 @@ export interface EnrichedPlayer {
   position: Position
   flockRank: number
   sleeperSearchRank: number
-  mockAdp: number | null
   currentPickNo: number
   available: boolean
   wentAt: number | null
   draftedByRosterId: number | null
   flockValue: number
-  mockAdpValue: number | null
+  ktcRank: number | null
+  ktcValue: number | null
+  ktcValueDelta: number | null
+  fcRank: number | null
+  fcValue: number | null
+  fcValueDelta: number | null
   dynastyProfile: DynastyProfile | null
   tier: string | null
 }
@@ -38,6 +42,20 @@ interface SleeperDraftMeta {
     rounds: number
   }
   league_id: string
+}
+
+interface KtcPlayer {
+  playerName: string
+  position: string
+  team?: string
+  value: number
+  overallRank: number
+}
+
+interface FcEntry {
+  player: { name: string; position: string; team?: string }
+  value: number
+  overallRank: number
 }
 
 // ── Dynasty profile helper ────────────────────────────────────────────────────
@@ -80,13 +98,11 @@ async function apiTextFetch(path: string): Promise<string> {
 
 interface UseDraftDataOptions {
   liveDraftId: string
-  mockDraftId?: string
   pollIntervalMs?: number
 }
 
 export function useDraftData({
   liveDraftId,
-  mockDraftId,
   pollIntervalMs = 30_000,
 }: UseDraftDataOptions) {
   const queryClient = useQueryClient()
@@ -101,12 +117,18 @@ export function useDraftData({
     staleTime: 60_000,
   })
 
-  // Mock draft picks for ADP baseline
-  const mockPicksQuery = useQuery({
-    queryKey: ['draft', mockDraftId, 'picks'],
-    queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft/${mockDraftId}/picks`),
-    staleTime: 5 * 60_000,
-    enabled: !!mockDraftId,
+  // KTC dynasty rankings (1h stale)
+  const ktcQuery = useQuery({
+    queryKey: ['ktc-rankings'],
+    queryFn: () => apiFetch<KtcPlayer[]>('/ktc-rankings'),
+    staleTime: 60 * 60_000,
+  })
+
+  // FantasyCalc dynasty rankings (1h stale)
+  const fcQuery = useQuery({
+    queryKey: ['fantasycalc-rankings'],
+    queryFn: () => apiFetch<FcEntry[]>('/fantasycalc-rankings'),
+    staleTime: 60 * 60_000,
   })
 
   // Live draft metadata (status, settings.teams/rounds)
@@ -132,7 +154,6 @@ export function useDraftData({
   const players = useMemo<EnrichedPlayer[]>(() => {
     if (!flockQuery.data) return []
 
-    // Parse Flock CSV — silently return empty on parse error
     let flockPlayers
     try {
       flockPlayers = parseFlockCsv(flockQuery.data)
@@ -141,7 +162,6 @@ export function useDraftData({
     }
 
     const livePicks = livePicksQuery.data ?? []
-    const mockPicks = mockPicksQuery.data ?? []
     const currentPickNo = livePicks.length + 1
 
     // Build Sleeper lookup maps
@@ -158,14 +178,20 @@ export function useDraftData({
       }
     }
 
-    // Build mock ADP map: playerId → pick_no
-    const mockAdpMap = new Map<string, number>()
-    for (const pick of mockPicks) {
-      mockAdpMap.set(pick.player_id, pick.pick_no)
+    // Build KTC lookup map: normalizedName → { rank, value }
+    const ktcMap = new Map<string, { rank: number; value: number }>()
+    for (const p of (ktcQuery.data ?? [])) {
+      ktcMap.set(normalizePlayerName(p.playerName), { rank: p.overallRank, value: p.value })
+    }
+
+    // Build FantasyCalc lookup map: normalizedName → { rank, value }
+    const fcMap = new Map<string, { rank: number; value: number }>()
+    for (const entry of (fcQuery.data ?? [])) {
+      if (!['QB', 'RB', 'WR', 'TE'].includes(entry.player.position)) continue
+      fcMap.set(normalizePlayerName(entry.player.name), { rank: entry.overallRank, value: entry.value })
     }
 
     // Build drafted set + wentAt + draftSlot maps
-    // Use draft_slot (not roster_id) — roster_id is 0 in mock drafts but draft_slot is always set
     const draftedSet = new Set<string>()
     const wentAtMap = new Map<string, number>()
     const rosterIdMap = new Map<string, number>()
@@ -175,8 +201,9 @@ export function useDraftData({
       rosterIdMap.set(pick.player_id, pick.draft_slot)
     }
 
+    const round2 = (n: number) => Math.round(n * 100) / 100
+
     return flockPlayers.map((fp) => {
-      // Match Flock player to Sleeper player ID
       const normName = normalizePlayerName(fp.name)
       const normTeam = fp.team.toLowerCase()
       const playerId =
@@ -187,12 +214,12 @@ export function useDraftData({
       const available = playerId != null ? !draftedSet.has(playerId) : true
       const wentAt = playerId != null ? (wentAtMap.get(playerId) ?? null) : null
       const draftedByRosterId = playerId != null ? (rosterIdMap.get(playerId) ?? null) : null
-      const mockAdp = playerId != null ? (mockAdpMap.get(playerId) ?? null) : null
       const sleeperPlayer = playerId != null ? playersMap?.[playerId] : null
       const sleeperSearchRank = sleeperPlayer?.search_rank ?? 9999
       const age = sleeperPlayer?.age ?? null
 
-      const round2 = (n: number) => Math.round(n * 100) / 100
+      const ktcEntry = ktcMap.get(normName) ?? null
+      const fcEntry  = fcMap.get(normName) ?? null
 
       return {
         name: fp.name,
@@ -201,18 +228,22 @@ export function useDraftData({
         position: fp.position,
         flockRank: fp.expertRank,
         sleeperSearchRank,
-        mockAdp,
         currentPickNo,
         available,
         wentAt,
         draftedByRosterId,
-        flockValue: round2(currentPickNo - fp.expertRank),
-        mockAdpValue: mockAdp != null ? round2(currentPickNo - mockAdp) : null,
+        flockValue:    round2(currentPickNo - fp.expertRank),
+        ktcRank:       ktcEntry?.rank  ?? null,
+        ktcValue:      ktcEntry?.value ?? null,
+        ktcValueDelta: ktcEntry ? round2(currentPickNo - ktcEntry.rank) : null,
+        fcRank:        fcEntry?.rank   ?? null,
+        fcValue:       fcEntry?.value  ?? null,
+        fcValueDelta:  fcEntry  ? round2(currentPickNo - fcEntry.rank)  : null,
         dynastyProfile: computeDynastyProfile(fp.position, age),
         tier: fp.tier,
       }
     })
-  }, [flockQuery.data, livePicksQuery.data, mockPicksQuery.data, playersMap])
+  }, [flockQuery.data, livePicksQuery.data, ktcQuery.data, fcQuery.data, playersMap])
 
   const livePicks = livePicksQuery.data ?? []
   const currentPickNo = livePicks.length + 1
@@ -230,7 +261,6 @@ export function useDraftData({
     flockQuery.isLoading ||
     (!!liveDraftId && (liveMetaQuery.isLoading || livePicksQuery.isLoading))
 
-  // True during any background refetch (after initial load) — use for spinner
   const isFetching =
     (!!liveDraftId && livePicksQuery.isFetching && !livePicksQuery.isLoading)
 

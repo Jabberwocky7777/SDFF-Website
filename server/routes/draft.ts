@@ -8,6 +8,9 @@ const router = Router()
 const LEAGUE_ID = process.env.LEAGUE_ID!
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 const CACHE_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
+
+const KTC_PAGE_URL = 'https://keeptradecut.com/dynasty-rankings'
+const FC_URL  = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&ppr=1'
 const FLOCK_FILE = path.join(CACHE_DIR, 'flock-rankings.csv')
 const FLOCK_DEFAULT = path.join(process.cwd(), 'server', 'data', 'flock-rankings-default.csv')
 
@@ -15,12 +18,52 @@ const FLOCK_DEFAULT = path.join(process.cwd(), 'server', 'data', 'flock-rankings
 let flockCache: { text: string; cachedAt: number } | null = null
 const FLOCK_TTL_MS = 60_000
 
-// ── Sleeper proxy helpers (duplicated from sleeper.ts — not exported there) ──
+// ── Proxy helpers ─────────────────────────────────────────────────────────────
 
 async function sleeperFetch(url: string): Promise<unknown> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Sleeper returned ${res.status} for ${url}`)
   return res.json()
+}
+
+async function externalFetch(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SDFF/1.0)' },
+  })
+  if (!res.ok) throw new Error(`External API returned ${res.status} for ${url}`)
+  return res.json()
+}
+
+// KTC embeds player data in the page HTML as `var playersArray = [...]`
+async function fetchKtcRankings(): Promise<unknown> {
+  const res = await fetch(KTC_PAGE_URL, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+    },
+  })
+  if (!res.ok) throw new Error(`KTC returned ${res.status}`)
+  const html = await res.text()
+  const idx = html.indexOf('var playersArray = [')
+  if (idx === -1) throw new Error('KTC: playersArray not found in page')
+  const end = html.indexOf('];', idx)
+  if (end === -1) throw new Error('KTC: playersArray end not found')
+  const raw = JSON.parse(html.slice(idx + 'var playersArray = '.length, end + 1)) as Array<{
+    playerName: string
+    position: string
+    team: string
+    oneQBValues?: { tep?: { rank?: number; value?: number } }
+  }>
+  return raw
+    .filter((p) => ['QB', 'RB', 'WR', 'TE'].includes(p.position))
+    .map((p) => ({
+      playerName: p.playerName,
+      position:   p.position,
+      team:       p.team,
+      overallRank: p.oneQBValues?.tep?.rank  ?? null,
+      value:       p.oneQBValues?.tep?.value ?? null,
+    }))
+    .filter((p) => p.overallRank != null)
 }
 
 async function cached(
@@ -31,24 +74,35 @@ async function cached(
   ttlSeconds: number,
 ): Promise<void> {
   const hit = readCache(key, ttlSeconds)
-  if (hit != null) {
-    res.json(hit)
-    return
-  }
-
+  if (hit != null) { res.json(hit); return }
   try {
     const data = await sleeperFetch(url)
     writeCache(key, data)
     res.json(data)
   } catch (err) {
     const stale = readStale(key)
-    if (stale != null) {
-      res.setHeader('X-Cache-Stale', 'true')
-      res.json(stale)
-    } else {
-      console.error('[draft]', err)
-      res.status(502).json({ error: 'Sleeper API unavailable and no cache found.' })
-    }
+    if (stale != null) { res.setHeader('X-Cache-Stale', 'true'); res.json(stale) }
+    else { console.error('[draft]', err); res.status(502).json({ error: 'Sleeper API unavailable and no cache found.' }) }
+  }
+}
+
+async function cachedExternal(
+  _req: Request,
+  res: Response,
+  key: string,
+  url: string,
+  ttlSeconds: number,
+): Promise<void> {
+  const hit = readCache(key, ttlSeconds)
+  if (hit != null) { res.json(hit); return }
+  try {
+    const data = await externalFetch(url)
+    writeCache(key, data)
+    res.json(data)
+  } catch (err) {
+    const stale = readStale(key)
+    if (stale != null) { res.setHeader('X-Cache-Stale', 'true'); res.json(stale) }
+    else { console.error('[draft]', err); res.status(502).json({ error: 'External API unavailable and no cache found.' }) }
   }
 }
 
@@ -135,6 +189,25 @@ router.post(
     res.json({ success: true, count: dataRows.length })
   },
 )
+
+// ── External ranking sources ──────────────────────────────────────────────────
+
+router.get('/ktc-rankings', (_req, res) => {
+  const hit = readCache('ktc_rankings', 3600)
+  if (hit != null) { res.json(hit); return }
+  void fetchKtcRankings().then((data) => {
+    writeCache('ktc_rankings', data)
+    res.json(data)
+  }).catch((err) => {
+    const stale = readStale('ktc_rankings')
+    if (stale != null) { res.setHeader('X-Cache-Stale', 'true'); res.json(stale) }
+    else { console.error('[ktc]', err); res.status(502).json({ error: 'KTC unavailable and no cache found.' }) }
+  })
+})
+
+router.get('/fantasycalc-rankings', (req, res) => {
+  void cachedExternal(req, res, 'fantasycalc_rankings', FC_URL, 3600)
+})
 
 // ── Draft metadata ────────────────────────────────────────────────────────────
 
