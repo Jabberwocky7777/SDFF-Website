@@ -80,6 +80,8 @@ interface ChampionshipOverride {
   regularSeasonWinner?: string | null
 }
 
+type ChampionshipStringField = Exclude<keyof ChampionshipOverride, 'year'>
+
 const CHAMP_FILE = filePath('championship-overrides.json')
 
 router.get('/championship-overrides', (_req, res) => {
@@ -104,7 +106,7 @@ router.post('/admin/championship', requireAdmin, (req, res) => {
   const overrides = readJson<ChampionshipOverride[]>(CHAMP_FILE, [])
   const existing = overrides.find((o) => o.year === year)
   if (existing) {
-    existing[field as keyof ChampionshipOverride] = value ?? null
+    existing[field as ChampionshipStringField] = value ?? null
   } else {
     overrides.push({ year, [field]: value ?? null })
   }
