@@ -1,6 +1,8 @@
-import { duesRecords, championshipHistory, getChampionshipCount, DUES_YEARS } from '@/data/dues'
+import { useQuery } from '@tanstack/react-query'
+import { apiFetch } from '@/api/client'
+import { duesRecords, championshipHistory, DUES_YEARS } from '@/data/dues'
 import { LEAGUE_CONFIG } from '@/data/leagueConfig'
-import type { DuesRecord } from '@/data/dues'
+import type { DuesRecord, PaymentStatus, ChampionshipRecord } from '@/data/dues'
 
 const ROLE_LABEL: Record<string, string> = {
   commissioner: 'Commissioner',
@@ -43,6 +45,40 @@ const seasonsCompleted = Math.max(0, currentYear - 2026)
 const squadPotBalance = seasonsCompleted * LEAGUE_CONFIG.squadPotContributionPerYear
 
 export default function Dues() {
+  const { data: duesOverrides = {} } = useQuery<Record<string, PaymentStatus>>({
+    queryKey: ['dues-overrides'],
+    queryFn: () => apiFetch('/api/dues-overrides'),
+  })
+
+  const { data: championshipOverrides = [] } = useQuery<ChampionshipRecord[]>({
+    queryKey: ['championship-overrides'],
+    queryFn: () => apiFetch('/api/championship-overrides'),
+  })
+
+  const { data: squadPotData } = useQuery<{ balance: number | null }>({
+    queryKey: ['squad-pot'],
+    queryFn: () => apiFetch('/api/squad-pot'),
+  })
+
+  const isSquadPotManual = squadPotData?.balance != null
+  const displaySquadPotBalance = isSquadPotManual ? squadPotData!.balance : squadPotBalance
+
+  const mergedChampionshipHistory: ChampionshipRecord[] = championshipHistory.map((rec) => {
+    const override = championshipOverrides.find((o) => o.year === rec.year)
+    return override ? { ...rec, ...override } : rec
+  })
+
+  function getMergedPaymentStatus(managerName: string, year: number): PaymentStatus {
+    const key = `${managerName}_${year}`
+    if (key in duesOverrides) return duesOverrides[key]
+    const record = duesRecords.find((r) => r.managerName === managerName)
+    return record?.payments[String(year)] ?? 'na'
+  }
+
+  function getChampCount(managerName: string): number {
+    return mergedChampionshipHistory.filter((r) => r.champion === managerName).length
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -85,7 +121,7 @@ export default function Dues() {
               </div>
               {DUES_YEARS.map((year) => (
                 <div key={year} className="flex items-center justify-center">
-                  <PaymentBadge status={rec.payments[String(year)] ?? 'na'} />
+                  <PaymentBadge status={getMergedPaymentStatus(rec.managerName, year)} />
                 </div>
               ))}
             </div>
@@ -108,9 +144,11 @@ export default function Dues() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-surface border border-border rounded-lg p-5 text-center">
             <div className="text-label text-muted uppercase font-semibold mb-1">Current Balance</div>
-            <div className="text-numLg font-bold text-gold">${squadPotBalance}</div>
+            <div className="text-numLg font-bold text-gold">${displaySquadPotBalance}</div>
             <div className="text-small text-muted mt-1">
-              {seasonsCompleted === 0
+              {isSquadPotManual
+                ? '(manually set)'
+                : seasonsCompleted === 0
                 ? 'Grows by $100 after each completed season'
                 : `After ${seasonsCompleted} season${seasonsCompleted > 1 ? 's' : ''}`}
             </div>
@@ -140,7 +178,7 @@ export default function Dues() {
               <div key={h} className="text-label text-muted uppercase tracking-[0.04em] font-semibold">{h}</div>
             ))}
           </div>
-          {championshipHistory.map((rec) => (
+          {mergedChampionshipHistory.map((rec) => (
             <div
               key={rec.year}
               className="grid border-b border-borderLow last:border-0 px-4 py-3 min-w-[640px]"
@@ -158,13 +196,13 @@ export default function Dues() {
         {/* Per-manager championship progress */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {sortedRecords.map((rec) => {
-            const count = getChampionshipCount(rec.managerName)
+            const count = getChampCount(rec.managerName)
             const backToBackPossible = (() => {
-              const years = championshipHistory.map((r) => r.year).sort((a, b) => a - b)
+              const years = mergedChampionshipHistory.map((r) => r.year).sort((a, b) => a - b)
               for (let i = 0; i < years.length - 1; i++) {
                 if (
-                  championshipHistory.find((r) => r.year === years[i])?.champion === rec.managerName &&
-                  championshipHistory.find((r) => r.year === years[i + 1])?.champion === rec.managerName
+                  mergedChampionshipHistory.find((r) => r.year === years[i])?.champion === rec.managerName &&
+                  mergedChampionshipHistory.find((r) => r.year === years[i + 1])?.champion === rec.managerName
                 ) return true
               }
               return false

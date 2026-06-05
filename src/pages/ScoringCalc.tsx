@@ -22,7 +22,7 @@ interface ScoreLine { label: string; value: number }
 function calcScore(s: Stats): ScoreLine[] {
   const lines: ScoreLine[] = []
   if (s.passYds)     lines.push({ label: `Pass yards (${s.passYds} × 0.04)`,     value: s.passYds * 0.04 })
-  if (s.passTDs)     lines.push({ label: `Pass TDs (${s.passTDs} × 4)`,           value: s.passTDs * 4 })
+  if (s.passTDs)     lines.push({ label: `Pass TDs (${s.passTDs} × 6)`,           value: s.passTDs * 6 })
   if (s.ints)        lines.push({ label: `Interceptions (${s.ints} × −2)`,        value: s.ints * -2 })
   if (s.pick6s)      lines.push({ label: `Pick-6 penalty (${s.pick6s} × −1)`,    value: s.pick6s * -1 })
   if (s.rushYds)     lines.push({ label: `Rush yards (${s.rushYds} × 0.1)`,      value: s.rushYds * 0.1 })

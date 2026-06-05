@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import sleeperRouter from './routes/sleeper.js'
 import announcementsRouter from './routes/announcements.js'
 import draftRouter from './routes/draft.js'
+import adminRouter from './routes/admin.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -87,6 +88,9 @@ app.use('/api', announcementsRouter)
 
 // Draft board (Flock rankings upload + draft metadata proxy)
 app.use('/api', draftRouter)
+
+// Editable admin data (dues, championship history, squad pot)
+app.use('/api', adminRouter)
 
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)

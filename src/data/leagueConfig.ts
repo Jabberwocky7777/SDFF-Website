@@ -1,5 +1,5 @@
 export const LEAGUE_CONFIG = {
-  leagueId: '',  // Set via LEAGUE_ID env var on the server; not needed client-side
+  leagueId: '', // SERVER ONLY — set via LEAGUE_ID env var. Never reference this client-side.
   totalManagers: 12,
   faabBudget: 100,
   duesPerYear: 100,

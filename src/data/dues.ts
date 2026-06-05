@@ -17,6 +17,8 @@ export interface ChampionshipRecord {
 
 export const DUES_YEARS = [2026, 2027, 2028, 2029, 2030]
 
+// To find Sleeper user IDs: check /api/users response — each user has a user_id field.
+// Match by display_name or team_name to fill in managerId below.
 // Per the bylaws: all 12 managers paid through 2027. 2028 and beyond unpaid.
 export const duesRecords: DuesRecord[] = [
   {
