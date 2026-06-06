@@ -215,13 +215,10 @@ router.get('/ktc/rankings', async (_req, res) => {
   }
 })
 
-// ── Sleeper projections ───────────────────────────────────────────────────────
-router.get('/projections/:season/:week', (req, res) => {
-  const { season, week } = req.params
-  const url =
-    `${SLEEPER_BASE}/projections/nfl/${season}/${week}` +
-    '?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE'
-  void cached(req, res, `projections-${season}-${week}`, url, 6 * 3600)
+// ── Sleeper season stats (actual pts_ppr totals for a completed season) ───────
+router.get('/stats/:season', (req, res) => {
+  const { season } = req.params
+  void cached(req, res, `stats-${season}`, `${SLEEPER_BASE}/stats/nfl/regular/${season}`, 24 * 3600)
 })
 
 export default router

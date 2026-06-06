@@ -80,8 +80,7 @@ export function gradeTeams(
       const fullName = `${pick.metadata.first_name} ${pick.metadata.last_name}`
       const ktc = byId.get(pick.player_id) ?? byName.get(fullName.toLowerCase())
       const ktcValue = ktc?.value ?? 1500
-      const rawPpts = sleeperProjections[pick.player_id]?.pts_ppr ?? 0
-      const projPts = rawPpts || 80
+      const projPts = sleeperProjections[pick.player_id]?.pts_ppr ?? 0
 
       totalDynastyValue += ktcValue
       totalProjPoints += projPts

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useDraftPicks } from '@/hooks/useDraftPicks'
-import { useDraftInfo, useKTCRankings, useSleeperProjections } from '@/hooks/useDraft'
+import { useDraftInfo, useKTCRankings, useSleeperStats } from '@/hooks/useDraft'
 import { useRosters } from '@/hooks/useRosters'
 import { useUsers } from '@/hooks/useUsers'
 import { gradeTeams, DRAFT_ID, type TeamGrade } from '@/lib/draftGrades'
@@ -27,7 +27,7 @@ export default function DraftGrades() {
   const picks = useDraftPicks(DRAFT_ID)
   const info = useDraftInfo(DRAFT_ID)
   const ktc = useKTCRankings()
-  const proj = useSleeperProjections(2026, 1)
+  const proj = useSleeperStats(2025)
   const rosters = useRosters()
   const users = useUsers()
 
@@ -130,7 +130,7 @@ export default function DraftGrades() {
               sortBy === v ? 'bg-gold text-[#1A1100]' : 'text-muted hover:text-text'
             }`}
           >
-            {v === 'value' ? 'Dynasty Value' : 'Projected Points'}
+            {v === 'value' ? 'Dynasty Value' : '2025 Points'}
           </button>
         ))}
       </div>
@@ -142,7 +142,7 @@ export default function DraftGrades() {
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide">#</div>
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide">Team</div>
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide text-right">Dyn Value</div>
-          <div className="text-label font-bold text-mutedLow uppercase tracking-wide text-right">Proj Pts</div>
+          <div className="text-label font-bold text-mutedLow uppercase tracking-wide text-right">2025 Pts</div>
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide text-right">Age</div>
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide" />
           <div className="text-label font-bold text-mutedLow uppercase tracking-wide text-right">Grade</div>

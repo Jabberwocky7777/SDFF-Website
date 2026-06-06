@@ -25,5 +25,5 @@ export const fetchDraftPicks = (draftId: string) =>
 export const fetchKTCRankings = () =>
   apiFetch<KTCPlayer[]>('/ktc/rankings')
 
-export const fetchSleeperProjections = (season: number, week: number) =>
-  apiFetch<Record<string, SleeperProjection>>(`/projections/${season}/${week}`)
+export const fetchSleeperStats = (season: number) =>
+  apiFetch<Record<string, SleeperProjection>>(`/stats/${season}`)

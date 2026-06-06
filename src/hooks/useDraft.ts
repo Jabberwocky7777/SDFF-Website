@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchDraftInfo, fetchKTCRankings, fetchSleeperProjections } from '@/api/draft'
+import { fetchDraftInfo, fetchKTCRankings, fetchSleeperStats } from '@/api/draft'
 import type { SleeperDraftInfo } from '@/api/draft'
 
 export function useDraftInfo(draftId: string | null | undefined) {
@@ -20,10 +20,11 @@ export function useKTCRankings() {
   })
 }
 
-export function useSleeperProjections(season: number, week: number) {
+export function useSleeperStats(season: number) {
   return useQuery({
-    queryKey: ['projections', season, week],
-    queryFn: () => fetchSleeperProjections(season, week),
-    staleTime: 6 * 60 * 60_000,
+    queryKey: ['stats', season],
+    queryFn: () => fetchSleeperStats(season),
+    staleTime: 24 * 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
   })
 }
