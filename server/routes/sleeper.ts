@@ -178,4 +178,50 @@ router.get('/rankings/ktc', async (req, res) => {
   }
 })
 
+// ── KTC Superflex JSON rankings ───────────────────────────────────────────────
+router.get('/ktc/rankings', async (_req, res) => {
+  const key = 'ktc-superflex'
+  const ttl = 24 * 60 * 60
+  const url = 'https://api.keeptradecut.com/dynasty-rankings?format=1&count=500&type=1'
+
+  const hit = readCache(key, ttl)
+  if (hit != null) {
+    res.json(hit)
+    return
+  }
+  try {
+    const fetchRes = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SDFF-Website/1.0)',
+        'Accept': 'application/json',
+      },
+    })
+    if (!fetchRes.ok) throw new Error(`KTC returned ${fetchRes.status}`)
+    const data = await fetchRes.json()
+    if (Array.isArray(data) && data.length > 0) {
+      console.log('[ktc/rankings] first element keys:', Object.keys(data[0] as object))
+    }
+    writeCache(key, data)
+    res.json(data)
+  } catch (err) {
+    console.warn('[ktc/rankings] fetch failed (server-side block likely):', err)
+    const stale = readStale(key)
+    if (stale != null) {
+      res.setHeader('X-Cache-Stale', 'true')
+      res.json(stale)
+    } else {
+      res.json([])
+    }
+  }
+})
+
+// ── Sleeper projections ───────────────────────────────────────────────────────
+router.get('/projections/:season/:week', (req, res) => {
+  const { season, week } = req.params
+  const url =
+    `${SLEEPER_BASE}/projections/nfl/${season}/${week}` +
+    '?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE'
+  void cached(req, res, `projections-${season}-${week}`, url, 6 * 3600)
+})
+
 export default router

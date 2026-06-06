@@ -14,6 +14,7 @@ import Admin from '@/pages/Admin'
 import Dues from '@/pages/Dues'
 import Picks from '@/pages/Picks'
 import DraftBoard from '@/pages/DraftBoard'
+import DraftGrades from '@/pages/DraftGrades'
 
 function AppRoutes() {
   const { authed, checking } = useAuth()
@@ -45,6 +46,7 @@ function AppRoutes() {
           <Route path="dues" element={<Dues />} />
           <Route path="picks" element={<Picks />} />
           <Route path="draft" element={<DraftBoard />} />
+          <Route path="draft-grades" element={<DraftGrades />} />
         </Route>
       </Routes>
     </BrowserRouter>

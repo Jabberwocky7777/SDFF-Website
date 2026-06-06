@@ -8,6 +8,7 @@ const links = [
   { to: '/rosters', label: 'Rosters' },
   { to: '/picks', label: 'Picks' },
   { to: '/draft', label: 'Draft' },
+  { to: '/draft-grades', label: 'Draft Grades' },
   { to: '/dues', label: 'Dues' },
   { to: '/timeline', label: 'Timeline' },
   { to: '/bylaws', label: 'Bylaws' },
