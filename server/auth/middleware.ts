@@ -85,6 +85,23 @@ export function requireLeagueAccess(req: Request, res: Response, next: NextFunct
   next()
 }
 
+/**
+ * Legacy unprefixed routes (/api/league, /api/rosters, …) serve the default
+ * configured league. Gate them so a session that only unlocked another league
+ * can't read the default league's data through the old paths (PLAN.md §6.7).
+ */
+export function requireDefaultLeagueAccess(req: Request, res: Response, next: NextFunction): void {
+  if (!req.auth) {
+    res.status(401).json({ error: 'unauthorized' })
+    return
+  }
+  const defaultSlug = getLeagues()[0]?.slug
+  if (req.auth.admin || (defaultSlug && req.auth.slugs.includes(defaultSlug))) {
+    return next()
+  }
+  res.status(403).json({ error: 'no access' })
+}
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 /** Admin via session flag OR the legacy X-Admin-Key header. */

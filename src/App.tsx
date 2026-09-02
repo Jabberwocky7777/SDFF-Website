@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AuthProvider, useAuth, useHasFullSite } from '@/context/AuthContext'
+import { LeaguesProvider } from '@/context/LeaguesContext'
 import SplashScreen from '@/components/auth/SplashScreen'
 import RootLayout from '@/components/layout/RootLayout'
 import Dashboard from '@/pages/Dashboard'
@@ -15,12 +16,30 @@ import Dues from '@/pages/Dues'
 import Picks from '@/pages/Picks'
 import DraftBoard from '@/pages/DraftBoard'
 import DraftGrades from '@/pages/DraftGrades'
+import HubLayout from '@/components/hub/HubLayout'
+import HubHome from '@/pages/hub/HubHome'
+import LeagueOverview from '@/pages/hub/LeagueOverview'
+import HubStandings from '@/pages/hub/HubStandings'
+import HubHistory from '@/pages/hub/HubHistory'
+import HubHeadToHead from '@/pages/hub/HubHeadToHead'
+import HubHeadToHeadGame from '@/pages/hub/HubHeadToHeadGame'
+import HubRecords from '@/pages/hub/HubRecords'
+import HubPowerRankings from '@/pages/hub/HubPowerRankings'
+import HubManagers from '@/pages/hub/HubManagers'
+import HubManagerProfile from '@/pages/hub/HubManagerProfile'
+
+function HomeGate() {
+  return useHasFullSite() ? <Dashboard /> : <Navigate to="/l" replace />
+}
+
+function SdffOnly({ children }: { children: React.ReactNode }) {
+  return useHasFullSite() ? <>{children}</> : <Navigate to="/l" replace />
+}
 
 function AppRoutes() {
   const { authed, checking } = useAuth()
 
   if (checking) {
-    // Minimal loading state while we validate stored credentials
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-2 h-2 rounded-full bg-gold/50 animate-pulse" />
@@ -34,19 +53,37 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<RootLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="standings" element={<Standings />} />
-          <Route path="rosters" element={<Rosters />} />
-          <Route path="rosters/:teamId" element={<TeamDetail />} />
-          <Route path="timeline" element={<Timeline />} />
-          <Route path="bylaws" element={<Bylaws />} />
-          <Route path="bylaws/scoring" element={<ScoringCalc />} />
+          <Route index element={<HomeGate />} />
+
+          {/* Flagship SDFF pages */}
+          <Route path="standings" element={<SdffOnly><Standings /></SdffOnly>} />
+          <Route path="rosters" element={<SdffOnly><Rosters /></SdffOnly>} />
+          <Route path="rosters/:teamId" element={<SdffOnly><TeamDetail /></SdffOnly>} />
+          <Route path="timeline" element={<SdffOnly><Timeline /></SdffOnly>} />
+          <Route path="bylaws" element={<SdffOnly><Bylaws /></SdffOnly>} />
+          <Route path="bylaws/scoring" element={<SdffOnly><ScoringCalc /></SdffOnly>} />
           <Route path="announcements" element={<Announcements />} />
-          <Route path="admin" element={<Admin />} />
-          <Route path="dues" element={<Dues />} />
-          <Route path="picks" element={<Picks />} />
-          <Route path="draft" element={<DraftBoard />} />
-          <Route path="draft-grades" element={<DraftGrades />} />
+          <Route path="admin" element={<SdffOnly><Admin /></SdffOnly>} />
+          <Route path="dues" element={<SdffOnly><Dues /></SdffOnly>} />
+          <Route path="picks" element={<SdffOnly><Picks /></SdffOnly>} />
+          <Route path="draft" element={<SdffOnly><DraftBoard /></SdffOnly>} />
+          <Route path="draft-grades" element={<SdffOnly><DraftGrades /></SdffOnly>} />
+
+          {/* Multi-league hub */}
+          <Route path="l" element={<HubHome />} />
+          <Route path="l/:slug" element={<HubLayout />}>
+            <Route index element={<LeagueOverview />} />
+            <Route path="standings" element={<HubStandings />} />
+            <Route path="history" element={<HubHistory />} />
+            <Route path="head-to-head" element={<HubHeadToHead />} />
+            <Route path="head-to-head/:userA/vs/:userB" element={<HubHeadToHeadGame />} />
+            <Route path="records" element={<HubRecords />} />
+            <Route path="power-rankings" element={<HubPowerRankings />} />
+            <Route path="managers" element={<HubManagers />} />
+            <Route path="managers/:userId" element={<HubManagerProfile />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
@@ -56,7 +93,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <LeaguesProvider>
+        <AppRoutes />
+      </LeaguesProvider>
     </AuthProvider>
   )
 }

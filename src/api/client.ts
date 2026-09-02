@@ -20,11 +20,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string>),
   }
+  // Auth is normally the httpOnly session cookie (sent automatically). The
+  // legacy Basic header is still added when a password happens to be stored,
+  // for the Vite dev proxy path and older sessions.
   if (password) {
     headers['Authorization'] = buildAuthHeader(password)
   }
 
-  const res = await fetch(url, { ...init, headers })
+  const res = await fetch(url, { ...init, credentials: 'include', headers })
 
   if (res.status === 401) {
     // Signal the auth context to show the splash screen
@@ -50,7 +53,7 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   if (password) headers['Authorization'] = buildAuthHeader(password)
   if (adminKey) headers['X-Admin-Key'] = adminKey
 
-  const res = await fetch(url, { ...init, headers })
+  const res = await fetch(url, { ...init, credentials: 'include', headers })
 
   if (res.status === 401) {
     window.dispatchEvent(new CustomEvent('sdff:auth-failure'))

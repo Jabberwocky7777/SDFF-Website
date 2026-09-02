@@ -200,7 +200,7 @@ export function getStandings(db: DB, slug: string, season?: number): StandingRow
               ts.regular_season_rank
        FROM team_season ts JOIN league_season ls ON ls.league_id = ts.league_id
        WHERE ls.family_id = ?${season != null ? ' AND ls.season = ?' : ''}
-         AND ts.user_id IS NOT NULL`,
+         AND ts.user_id IS NOT NULL AND ls.status = 'complete'`,
     )
     .all(...(season != null ? [family.id, season] : [family.id])) as Array<{
     user_id: string
@@ -212,6 +212,9 @@ export function getStandings(db: DB, slug: string, season?: number): StandingRow
   }>
 
   for (const ts of teamSeasons) {
+    // Don't materialize a manager who has no games in scope (e.g. a pre-draft
+    // roster for a season that hasn't started).
+    if (!agg.has(ts.user_id)) continue
     const row = get(ts.user_id)
     if (ts.final_rank === 1) row.championships++
     if (ts.final_rank === 2) row.runnerUps++

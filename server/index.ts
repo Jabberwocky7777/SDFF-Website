@@ -11,7 +11,12 @@ import leaguesRouter from './routes/leagues.js'
 import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
 import { getDb } from './db/index.js'
 import { startScheduler } from './sync/scheduler.js'
-import { attachAuth, requireAuth, requireLeagueAccess } from './auth/middleware.js'
+import {
+  attachAuth,
+  requireAuth,
+  requireDefaultLeagueAccess,
+  requireLeagueAccess,
+} from './auth/middleware.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -105,14 +110,13 @@ app.use('/api/leagues/:slug', requireLeagueAccess, leaguesRouter)
 // Everything below requires a valid session (or legacy Basic Auth).
 app.use('/api', requireAuth)
 
-// Sleeper API proxy with caching (legacy single-league — default league)
-app.use('/api', sleeperRouter)
-
-// Announcements
+// Announcements — visible to any authenticated visitor.
 app.use('/api', announcementsRouter)
 
-// Draft board (Flock rankings upload + draft metadata proxy)
-app.use('/api', draftRouter)
+// Legacy single-league routes serve the DEFAULT league — gate them so a
+// session that only unlocked a different league can't read it here.
+app.use('/api', requireDefaultLeagueAccess, sleeperRouter)
+app.use('/api', requireDefaultLeagueAccess, draftRouter)
 
 // Editable admin data (dues, championship history, squad pot)
 app.use('/api', adminRouter)
