@@ -18,8 +18,12 @@ Leagues stay **siloed** for now: head-to-head and records are scoped to one
 league family. No cross-league aggregation UI yet (but `manager` is still a
 global table keyed by Sleeper `user_id`).
 
-Access is per-league: each league in `config/leagues.json` has its own short
-access code. Entering a code unlocks that league. An admin code unlocks all.
+Access is per-league and code-only — there is **no site password**. Each league
+in `config/leagues.json` has its own short `accessCode`; entering it sets a
+signed session cookie unlocking that league. The top-level `adminCode` unlocks
+every league plus the admin panel. `config/leagues.json` is required (mounted as
+a volume in prod). The session signing key comes from `SESSION_SECRET` or is
+auto-generated into `<CACHE_DIR>/.session-secret`.
 
 ## Architecture rules
 - Historical/computed data -> SQLite. Live/volatile data -> file cache proxy.
@@ -65,5 +69,4 @@ src/                       # React frontend
 - Zod-validate every external API response at the boundary.
 - Every new analytics function needs a unit test with fixture data.
 - Points as numbers, never strings. Guard against null `points`.
-- Keep `main` deployable at every step. The `LEAGUE_ID` env var must keep
-  working (single-league fallback) until the multi-league path fully replaces it.
+- Keep `main` deployable at every step.

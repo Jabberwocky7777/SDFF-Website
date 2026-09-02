@@ -10,8 +10,6 @@ interface AuthContextValue {
   /** Enter an access code. Returns true on success. */
   login: (code: string) => Promise<boolean>
   logout: () => Promise<void>
-  /** Back-compat alias used by the splash screen. */
-  setPassword: (code: string) => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -91,9 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider
-      value={{ authed, checking, slugs, admin, login, logout, setPassword: login }}
-    >
+    <AuthContext.Provider value={{ authed, checking, slugs, admin, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

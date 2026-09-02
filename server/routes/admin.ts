@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
+import { requireAdmin } from '../auth/middleware.js'
 
 const router = Router()
 
 const DATA_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 function filePath(name: string) {
   return path.join(DATA_DIR, name)
@@ -24,22 +24,6 @@ function writeJson(file: string, data: unknown): void {
   fs.mkdirSync(DATA_DIR, { recursive: true })
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
   fs.renameSync(tmp, file)
-}
-
-function requireAdmin(
-  req: import('express').Request,
-  res: import('express').Response,
-  next: import('express').NextFunction,
-) {
-  if (!ADMIN_PASSWORD) {
-    res.status(503).json({ error: 'Admin password not configured' })
-    return
-  }
-  if (req.headers['x-admin-key'] !== ADMIN_PASSWORD) {
-    res.status(403).json({ error: 'Forbidden' })
-    return
-  }
-  next()
 }
 
 // ── Dues overrides ──────────────────────────────────────────────────────────

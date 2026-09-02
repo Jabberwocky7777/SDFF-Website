@@ -1,6 +1,8 @@
-import { FormEvent, useState, useEffect } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
-import { ADMIN_KEY, adminFetch, apiFetch } from '@/api/client'
+import { adminFetch, apiFetch } from '@/api/client'
+import { useAuth } from '@/context/AuthContext'
 import { createAnnouncement, deleteAnnouncement, togglePin } from '@/api/announcements'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import GoldRule from '@/components/ui/GoldRule'
@@ -50,71 +52,20 @@ const CHAMP_FIELDS: { key: keyof Omit<ChampionshipRecord, 'year'>; label: string
   { key: 'regularSeasonWinner', label: 'Reg. Season Winner' },
 ]
 
-function AdminUnlock({ onUnlock }: { onUnlock: () => void }) {
-  const [pwd, setPwd] = useState('')
-  const [show, setShow] = useState(false)
-  const [error, setError] = useState(false)
-
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    if (!pwd.trim()) return
-    sessionStorage.setItem(ADMIN_KEY, pwd.trim())
-    onUnlock()
-  }
-
+function AdminLocked() {
   return (
-    <div className="max-w-sm mx-auto mt-16">
-      <div className="flex flex-col items-center mb-8">
-        <h1 className="font-sans text-h1 font-bold text-text mb-1">Admin Panel</h1>
-        <p className="text-small text-muted">Commissioner access</p>
-      </div>
-
-      <div className="bg-surface border border-borderLow rounded-lg p-6">
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-label text-muted uppercase font-sans mb-2">
-              Admin Password
-            </label>
-            <div className="relative">
-              <input
-                type={show ? 'text' : 'password'}
-                value={pwd}
-                onChange={(e) => { setPwd(e.target.value); setError(false) }}
-                placeholder="Enter admin password"
-                autoFocus
-                className={`w-full bg-background border rounded-lg px-3 py-2.5 pr-10 font-sans text-base text-text placeholder-muted/50 outline-none transition-colors ${
-                  error ? 'border-red-500/60' : 'border-borderLow focus:border-border'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => setShow((s) => !s)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
-              >
-                {show ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {error && <p className="mt-1.5 text-red-400 text-small font-sans">Invalid admin password.</p>}
-          </div>
-          <button
-            type="submit"
-            disabled={!pwd.trim()}
-            className="w-full bg-gold text-background font-sans font-semibold text-base py-2.5 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            Unlock
-          </button>
-        </form>
-      </div>
+    <div className="max-w-sm mx-auto mt-16 text-center">
+      <h1 className="font-sans text-h1 font-bold text-text mb-2">Admin Panel</h1>
+      <p className="text-base text-muted mb-6">
+        Sign in with the commissioner (admin) code to manage announcements, dues,
+        and championship history.
+      </p>
+      <Link
+        to="/"
+        className="inline-block bg-gold text-background font-sans font-semibold text-base px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity"
+      >
+        Go to sign in
+      </Link>
     </div>
   )
 }
@@ -145,17 +96,17 @@ function AdminPanel() {
   // ── Queries ─────────────────────────────────────────────────────────────
   const { data: duesOverrides = {} } = useQuery<Record<string, PaymentStatus>>({
     queryKey: ['dues-overrides'],
-    queryFn: () => apiFetch('/api/dues-overrides'),
+    queryFn: () => apiFetch('/dues-overrides'),
   })
 
   const { data: championshipOverrides = [] } = useQuery<ChampionshipRecord[]>({
     queryKey: ['championship-overrides'],
-    queryFn: () => apiFetch('/api/championship-overrides'),
+    queryFn: () => apiFetch('/championship-overrides'),
   })
 
   const { data: squadPotData } = useQuery<{ balance: number | null }>({
     queryKey: ['squad-pot'],
-    queryFn: () => apiFetch('/api/squad-pot'),
+    queryFn: () => apiFetch('/squad-pot'),
   })
 
   useEffect(() => {
@@ -224,9 +175,11 @@ function AdminPanel() {
     }
   }
 
+  const { logout } = useAuth()
   function handleLogout() {
-    sessionStorage.removeItem(ADMIN_KEY)
-    window.location.reload()
+    void logout().then(() => {
+      window.location.href = '/'
+    })
   }
 
   // ── Dues editor handler ─────────────────────────────────────────────────
@@ -237,7 +190,7 @@ function AdminPanel() {
     setDuesSaving((s) => ({ ...s, [key]: true }))
     setDuesSaveMsg((s) => ({ ...s, [key]: '' }))
     try {
-      await adminFetch('/api/admin/dues', {
+      await adminFetch('/admin/dues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ managerName, year, status: newStatus }),
@@ -256,7 +209,7 @@ function AdminPanel() {
     const value = getChampFieldValue(year, field)
     setChampStatus((s) => ({ ...s, [key]: 'saving' }))
     try {
-      await adminFetch('/api/admin/championship', {
+      await adminFetch('/admin/championship', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year, field, value: value.trim() || null }),
@@ -274,7 +227,7 @@ function AdminPanel() {
     if (isNaN(balance)) return
     setSquadPotStatus('saving')
     try {
-      await adminFetch('/api/admin/squad-pot', {
+      await adminFetch('/admin/squad-pot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ balance }),
@@ -540,12 +493,6 @@ function AdminPanel() {
 }
 
 export default function Admin() {
-  const [unlocked, setUnlocked] = useState(false)
-
-  useEffect(() => {
-    if (sessionStorage.getItem(ADMIN_KEY)) setUnlocked(true)
-  }, [])
-
-  if (!unlocked) return <AdminUnlock onUnlock={() => setUnlocked(true)} />
-  return <AdminPanel />
+  const { admin } = useAuth()
+  return admin ? <AdminPanel /> : <AdminLocked />
 }

@@ -138,6 +138,8 @@ export interface StandingRow {
 }
 
 export function getStandings(db: DB, slug: string, season?: number): StandingRow[] {
+  const family = getFamily(db, slug)
+  if (!family) return []
   const games = familyGames(db, slug, { season: season ?? undefined })
   const names = displayNames(db, games.map((g) => g.user_id))
 
@@ -192,7 +194,6 @@ export function getStandings(db: DB, slug: string, season?: number): StandingRow
   }
 
   // Season-level facts: finishes + playoff appearances.
-  const family = getFamily(db, slug)!
   const teamSeasons = db
     .prepare(
       `SELECT ts.user_id, ls.season, ts.final_rank, ls.total_rosters,

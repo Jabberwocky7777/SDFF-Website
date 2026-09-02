@@ -4,9 +4,15 @@ services:
     ports:
       - "7780:3001"    # host:container — server always listens on 3001 inside the container
     volumes:
-      - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path (holds the JSON cache + sdff.db)
-      # Real league config, mounted read-only so leagues can be added without rebuilding:
-      - /mnt/pool/sdff/leagues.json:/app/config/leagues.json:ro
+      # 1. Persistent app data: JSON cache, the SQLite history DB (sdff.db),
+      #    and the auto-generated .session-secret. Point this at your existing
+      #    sdff cache dataset — the DB just lands alongside the JSON files.
+      - /mnt/pool/sdff-cache:/app/cache
+
+      # 2. League config directory. Must contain leagues.json BEFORE first start
+      #    (copy config/leagues.example.json into it and set the access codes).
+      #    A plain directory is fine — it does not need to be its own dataset.
+      - /mnt/pool/sdff/config:/app/config
     env_file:
       - .env
     restart: unless-stopped

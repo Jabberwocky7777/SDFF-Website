@@ -1,6 +1,7 @@
 {
-  "$comment": "Copy to config/leagues.json and fill in real values. In production this file is mounted as a volume so leagues can be added without rebuilding the image. Run `npm run leagues:discover -- --username <you>` to list your league IDs.",
+  "$comment": "Copy to config/leagues.json. This file is the ONLY place credentials live — each league's `accessCode` (min 3 chars, e.g. a 4-letter code) unlocks that league, and `adminCode` unlocks everything plus the admin panel. In production, mount the containing directory as /app/config so codes can change without rebuilding. Run `npm run leagues:discover -- --username <you>` to list your league IDs.",
   "sleeperUsername": "your_sleeper_username",
+  "adminCode": "CHANGE-ME",
   "leagues": [
     {
       "slug": "sdff",
@@ -17,14 +18,12 @@
       "currentLeagueId": "000000000000000000",
       "type": "redraft",
       "sortOrder": 2,
-      "accessCode": "0000",
+      "accessCode": "RDFT",
       "theme": { "accent": "#059669" }
     }
   ],
-  "adminCode": "change_me_admin",
   "managerAliases": {
-    "$comment": "map a stale Sleeper user_id to the canonical one it should merge into",
-    "0000000000": "1111111111"
+    "$comment": "map a stale Sleeper user_id to the canonical one it should merge into, e.g. \"0000000000\": \"1111111111\""
   },
   "displayNameOverrides": {
     "$comment": "map a Sleeper user_id to the name to show instead of their display_name"

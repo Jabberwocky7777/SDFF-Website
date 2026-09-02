@@ -6,9 +6,10 @@
  * anywhere else, and always validate an incoming `:slug` against this config
  * before touching the Sleeper API (PLAN.md §6.7).
  *
- * Backward-compat: if `config/leagues.json` is absent but `LEAGUE_ID` is set,
- * a one-league config is synthesized from the env vars so the existing
- * single-league deployment keeps working through the migration (PLAN.md §3).
+ * `config/leagues.json` is the single source of auth: each league's short
+ * `accessCode` (and the top-level `adminCode`) are the only credentials — there
+ * is no site password. In production the file is mounted as a volume so leagues
+ * and codes can be changed without rebuilding the image.
  */
 import fs from 'fs'
 import path from 'path'
@@ -33,8 +34,8 @@ const leagueSchema = z.object({
   currentLeagueId: z.string().regex(/^\d+$/, 'currentLeagueId must be a numeric Sleeper ID'),
   type: z.enum(LEAGUE_TYPES),
   sortOrder: z.number().int().default(0),
-  /** Short code a leaguemate enters to view this league's history. */
-  accessCode: z.string().min(1),
+  /** Short code a leaguemate enters to unlock this league. Set at setup time. */
+  accessCode: z.string().trim().min(3, 'accessCode must be at least 3 characters'),
   theme: themeSchema,
 })
 
@@ -80,52 +81,17 @@ function stripComments(value: unknown): unknown {
   return value
 }
 
-function synthesizeFromEnv(): LeaguesConfig | null {
-  const leagueId = process.env.LEAGUE_ID
-  if (!leagueId) return null
-  const accessCode = process.env.SITE_PASSWORD ?? 'SDFF'
-  console.warn(
-    '[leagues] config/leagues.json not found — synthesizing a one-league config from LEAGUE_ID. ' +
-      'Create config/leagues.json to run multi-league.',
-  )
-  return configSchema.parse({
-    leagues: [
-      {
-        slug: 'sdff',
-        displayName: 'Squad Dynasty Fantasy Football',
-        currentLeagueId: leagueId,
-        type: 'dynasty',
-        sortOrder: 1,
-        accessCode,
-        theme: { accent: '#E0B544' },
-      },
-    ],
-    adminCode: process.env.ADMIN_PASSWORD,
-    managerAliases: {},
-    displayNameOverrides: {},
-  })
-}
-
 export function loadLeaguesConfig(): LeaguesConfig {
   if (cached) return cached
 
-  let raw: string | null = null
+  let raw: string
   try {
     raw = fs.readFileSync(CONFIG_PATH, 'utf8')
   } catch {
-    /* file absent — fall back to the LEAGUE_ID shim below */
-  }
-
-  if (raw == null) {
-    const fromEnv = synthesizeFromEnv()
-    if (!fromEnv) {
-      throw new Error(
-        `No league configuration found. Create ${CONFIG_PATH} (see config/leagues.example.json) ` +
-          'or set the LEAGUE_ID env var for single-league mode.',
-      )
-    }
-    cached = fromEnv
-    return cached
+    throw new Error(
+      `League config not found at ${CONFIG_PATH}. Copy config/leagues.example.json to ` +
+        `config/leagues.json (mount it as a volume in production) and set each league's accessCode.`,
+    )
   }
 
   let parsed: unknown
@@ -143,11 +109,24 @@ export function loadLeaguesConfig(): LeaguesConfig {
   }
 
   const slugs = new Set<string>()
+  const codes = new Set<string>()
   for (const league of result.data.leagues) {
     if (slugs.has(league.slug)) {
       throw new Error(`${CONFIG_PATH}: duplicate league slug "${league.slug}"`)
     }
     slugs.add(league.slug)
+    if (codes.has(league.accessCode)) {
+      throw new Error(`${CONFIG_PATH}: two leagues share the access code "${league.accessCode}"`)
+    }
+    codes.add(league.accessCode)
+  }
+  if (result.data.adminCode && codes.has(result.data.adminCode)) {
+    throw new Error(`${CONFIG_PATH}: adminCode must not match a league accessCode`)
+  }
+  if (!result.data.adminCode) {
+    console.warn(
+      `[leagues] no adminCode set in ${CONFIG_PATH} — the admin panel and cross-league access are disabled`,
+    )
   }
 
   cached = result.data

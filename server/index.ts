@@ -21,34 +21,24 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-if (!process.env.SITE_PASSWORD) {
-  console.error('[startup] Missing required env var: SITE_PASSWORD')
-  process.exit(1)
-}
-
-// League config: either config/leagues.json or a LEAGUE_ID env-var fallback.
+// League config (config/leagues.json) is required — it holds every league's
+// access code, which is the only credential.
 try {
   const config = loadLeaguesConfig()
-  console.log(
-    `[startup] leagues: ${config.leagues.map((l) => l.slug).join(', ')}`,
-  )
+  console.log(`[startup] leagues: ${config.leagues.map((l) => l.slug).join(', ')}`)
 } catch (err) {
   console.error(`[startup] ${(err as Error).message}`)
   process.exit(1)
 }
 
 // Open the SQLite DB and run migrations. A DB failure must not take down the
-// live proxy, so this is best-effort during the multi-league migration.
+// live proxy, so this is best-effort.
 try {
   getDb()
   console.log('[startup] SQLite ready')
   startScheduler()
 } catch (err) {
   console.error('[startup] SQLite init failed (historical routes will be unavailable):', err)
-}
-
-if (!process.env.ADMIN_PASSWORD) {
-  console.warn('[startup] ADMIN_PASSWORD not set — announcements admin endpoint will be disabled')
 }
 
 const app = express()
@@ -123,7 +113,5 @@ app.use('/api', adminRouter)
 
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)
-  if (IS_DEV) {
-    console.log('[dev] auth: session cookie or legacy Basic Auth (SITE_PASSWORD)')
-  }
+  if (IS_DEV) console.log('[dev] auth: log in with a league access code from config/leagues.json')
 })

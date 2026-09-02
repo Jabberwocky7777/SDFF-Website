@@ -6,6 +6,8 @@
  * base64url-encoded JSON token — no server-side session store, no external dep.
  */
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 
 export const SESSION_COOKIE = 'sdff_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -18,14 +20,40 @@ export interface SessionPayload {
   iat: number
 }
 
+let cachedSecret: string | null = null
+
+/**
+ * Signing key for session cookies. Uses SESSION_SECRET if provided; otherwise
+ * generates one and persists it in the cache dataset so it survives restarts
+ * (no env var needed for a standard single-instance TrueNAS deploy).
+ */
 function getSecret(): string {
-  const s = process.env.SESSION_SECRET
-  if (s && s.length >= 16) return s
-  // Fallback keeps single-instance deploys working without a new env var, but
-  // rotates the signing key on every SITE_PASSWORD change (acceptable).
-  const fallback = process.env.SITE_PASSWORD
-  if (fallback) return `sdff-session-${fallback}`
-  throw new Error('SESSION_SECRET (or SITE_PASSWORD) must be set to sign sessions')
+  if (cachedSecret) return cachedSecret
+
+  const fromEnv = process.env.SESSION_SECRET
+  if (fromEnv && fromEnv.length >= 16) {
+    cachedSecret = fromEnv
+    return cachedSecret
+  }
+
+  const cacheDir = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
+  const secretFile = path.join(cacheDir, '.session-secret')
+  try {
+    cachedSecret = fs.readFileSync(secretFile, 'utf8').trim()
+    if (cachedSecret.length >= 16) return cachedSecret
+  } catch {
+    /* generate below */
+  }
+
+  cachedSecret = crypto.randomBytes(32).toString('hex')
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true })
+    fs.writeFileSync(secretFile, cachedSecret, { mode: 0o600 })
+    console.log('[auth] generated a new session secret at', secretFile)
+  } catch (err) {
+    console.warn('[auth] could not persist session secret — sessions reset on restart:', err)
+  }
+  return cachedSecret
 }
 
 function b64url(buf: Buffer | string): string {

@@ -2,12 +2,12 @@ import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
+import { requireAdmin } from '../auth/middleware.js'
 
 const router = Router()
 
 const DATA_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
 const FILE = path.join(DATA_DIR, 'announcements.json')
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 interface Announcement {
   id: string
@@ -43,18 +43,6 @@ function sorted(list: Announcement[]): Announcement[] {
     if (!a.pinned && b.pinned) return 1
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
-}
-
-function requireAdmin(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) {
-  if (!ADMIN_PASSWORD) {
-    res.status(503).json({ error: 'Admin password not configured' })
-    return
-  }
-  if (req.headers['x-admin-key'] !== ADMIN_PASSWORD) {
-    res.status(403).json({ error: 'Forbidden' })
-    return
-  }
-  next()
 }
 
 // GET /api/announcements — returns sorted list

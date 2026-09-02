@@ -138,3 +138,15 @@ describe('getTimeline', () => {
     expect(t.ranks.A[2023]).toBe(1)
   })
 })
+
+describe('unknown / not-yet-ingested league', () => {
+  it('every query returns an empty shape instead of throwing', () => {
+    const empty = freshDb() // migrated, no data
+    expect(() => getStandings(empty, 'nope')).not.toThrow()
+    expect(getStandings(empty, 'nope')).toEqual([])
+    expect(getH2HMatrix(empty, 'nope').managers).toEqual([])
+    expect(getRecordsBook(empty, 'nope')).toEqual([])
+    expect(getTimeline(empty, 'nope').seasons).toEqual([])
+    expect(getH2HGameLog(empty, 'nope', 'x', 'y').games).toEqual([])
+  })
+})
