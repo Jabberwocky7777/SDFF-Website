@@ -5,30 +5,6 @@
  */
 import type { DB } from '../db/index.js'
 
-export interface FamilyRow {
-  slug: string
-  displayName: string
-  leagueType: string
-  currentLeagueId: string
-  sortOrder: number
-}
-
-export function upsertFamily(db: DB, row: FamilyRow): number {
-  db.prepare(
-    `INSERT INTO league_family (slug, display_name, league_type, current_league_id, sort_order)
-     VALUES (@slug, @displayName, @leagueType, @currentLeagueId, @sortOrder)
-     ON CONFLICT(slug) DO UPDATE SET
-       display_name = excluded.display_name,
-       league_type = excluded.league_type,
-       current_league_id = excluded.current_league_id,
-       sort_order = excluded.sort_order`,
-  ).run(row)
-  const { id } = db.prepare(`SELECT id FROM league_family WHERE slug = ?`).get(row.slug) as {
-    id: number
-  }
-  return id
-}
-
 export interface LeagueSeasonRow {
   leagueId: string
   familyId: number
@@ -93,10 +69,15 @@ export function setManagerAlias(db: DB, staleUserId: string, canonicalUserId: st
   // Ensure both rows exist so the FK holds.
   db.prepare(`INSERT OR IGNORE INTO manager (user_id) VALUES (?)`).run(staleUserId)
   db.prepare(`INSERT OR IGNORE INTO manager (user_id) VALUES (?)`).run(canonicalUserId)
-  db.prepare(`UPDATE manager SET alias_of = ? WHERE user_id = ?`).run(
-    canonicalUserId,
-    staleUserId,
-  )
+  db.prepare(`UPDATE manager SET alias_of = ? WHERE user_id = ?`).run(canonicalUserId, staleUserId)
+}
+
+/** Copy the admin-managed manager_alias table into manager.alias_of before a sync. */
+export function applyManagerAliases(db: DB): void {
+  const rows = db
+    .prepare(`SELECT alias_user_id, canonical_user_id FROM manager_alias`)
+    .all() as Array<{ alias_user_id: string; canonical_user_id: string }>
+  for (const r of rows) setManagerAlias(db, r.alias_user_id, r.canonical_user_id)
 }
 
 /** Follow alias_of to the canonical manager id (1 hop is the norm; guard cycles). */

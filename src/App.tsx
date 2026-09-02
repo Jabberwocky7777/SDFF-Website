@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth, useHasFullSite } from '@/context/AuthContext'
 import { LeaguesProvider } from '@/context/LeaguesContext'
 import SplashScreen from '@/components/auth/SplashScreen'
+import SetupScreen from '@/components/auth/SetupScreen'
 import RootLayout from '@/components/layout/RootLayout'
 import Dashboard from '@/pages/Dashboard'
 import Standings from '@/pages/Standings'
@@ -12,6 +13,7 @@ import Bylaws from '@/pages/Bylaws'
 import ScoringCalc from '@/pages/ScoringCalc'
 import Announcements from '@/pages/Announcements'
 import Admin from '@/pages/Admin'
+import AdminSettings from '@/pages/AdminSettings'
 import Dues from '@/pages/Dues'
 import Picks from '@/pages/Picks'
 import DraftBoard from '@/pages/DraftBoard'
@@ -29,15 +31,22 @@ import HubManagers from '@/pages/hub/HubManagers'
 import HubManagerProfile from '@/pages/hub/HubManagerProfile'
 
 function HomeGate() {
-  return useHasFullSite() ? <Dashboard /> : <Navigate to="/l" replace />
+  const { hasLeagues, admin } = useAuth()
+  const fullSite = useHasFullSite()
+  if (!hasLeagues) return <Navigate to={admin ? '/settings' : '/l'} replace />
+  return fullSite ? <Dashboard /> : <Navigate to="/l" replace />
 }
 
 function SdffOnly({ children }: { children: React.ReactNode }) {
   return useHasFullSite() ? <>{children}</> : <Navigate to="/l" replace />
 }
 
+function AdminOnly({ children }: { children: React.ReactNode }) {
+  return useAuth().admin ? <>{children}</> : <Navigate to="/" replace />
+}
+
 function AppRoutes() {
-  const { authed, checking } = useAuth()
+  const { authed, checking, needsSetup } = useAuth()
 
   if (checking) {
     return (
@@ -47,6 +56,7 @@ function AppRoutes() {
     )
   }
 
+  if (needsSetup) return <SetupScreen />
   if (!authed) return <SplashScreen />
 
   return (
@@ -55,7 +65,9 @@ function AppRoutes() {
         <Route path="/" element={<RootLayout />}>
           <Route index element={<HomeGate />} />
 
-          {/* Flagship SDFF pages */}
+          <Route path="settings" element={<AdminOnly><AdminSettings /></AdminOnly>} />
+
+          {/* Flagship dynasty pages */}
           <Route path="standings" element={<SdffOnly><Standings /></SdffOnly>} />
           <Route path="rosters" element={<SdffOnly><Rosters /></SdffOnly>} />
           <Route path="rosters/:teamId" element={<SdffOnly><TeamDetail /></SdffOnly>} />

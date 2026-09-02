@@ -6,14 +6,19 @@ import sleeperRouter from './routes/sleeper.js'
 import announcementsRouter from './routes/announcements.js'
 import draftRouter from './routes/draft.js'
 import adminRouter from './routes/admin.js'
+import adminLeaguesRouter from './routes/admin-leagues.js'
 import authRouter from './routes/auth.js'
+import setupRouter from './routes/setup.js'
 import leaguesRouter from './routes/leagues.js'
-import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
+import { getLeagues, toPublicLeague } from './config/leagues.js'
+import { bootstrapLeaguesIfEmpty } from './config/bootstrap.js'
+import { maybeResetAdmin } from './auth/admin.js'
 import { getDb } from './db/index.js'
 import { startScheduler } from './sync/scheduler.js'
 import { autoBackfillIfNeeded } from './sync/autobackfill.js'
 import {
   attachAuth,
+  requireAdmin,
   requireAuth,
   requireDefaultLeagueAccess,
   requireLeagueAccess,
@@ -22,24 +27,18 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// League config (config/leagues.json) is required — it holds every league's
-// access code, which is the only credential.
+// Open the SQLite DB (runs migrations), migrate any legacy file/env config into
+// it, then start the sync scheduler. A DB failure must not take down the proxy.
 try {
-  const config = loadLeaguesConfig()
-  console.log(`[startup] leagues: ${config.leagues.map((l) => l.slug).join(', ')}`)
-} catch (err) {
-  console.error(`[startup] ${(err as Error).message}`)
-  process.exit(1)
-}
-
-// Open the SQLite DB and run migrations. A DB failure must not take down the
-// live proxy, so this is best-effort.
-try {
-  getDb()
-  console.log('[startup] SQLite ready')
+  const db = getDb()
+  maybeResetAdmin(db)
+  bootstrapLeaguesIfEmpty(db)
+  const slugs = getLeagues(db).map((l) => l.slug)
+  console.log(`[startup] SQLite ready — leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
   startScheduler()
 } catch (err) {
-  console.error('[startup] SQLite init failed (historical routes will be unavailable):', err)
+  console.error('[startup] SQLite init failed:', err)
+  process.exit(1)
 }
 
 const app = express()
@@ -76,16 +75,23 @@ if (IS_DEV) {
   app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 }
 
-// Populate req.auth from the session cookie or legacy Basic Auth (never rejects).
+// Populate req.auth from the session cookie (never rejects).
 app.use(attachAuth)
 
-// Auth endpoints (login must be reachable without prior auth).
+// First-run setup + auth endpoints — reachable without a session.
+app.use('/api', setupRouter)
 app.use('/api', authRouter)
 
-// Legacy credential check — kept for the current frontend / Vite dev proxy.
+// Lightweight credential check used by older frontend code.
 app.get('/api/me', requireAuth, (_req, res) => {
   res.json({ ok: true })
 })
+
+// Everything under /api/admin/* requires an admin session.
+app.use('/api/admin', requireAuth, requireAdmin)
+
+// Admin settings API (manage leagues, codes, password).
+app.use('/api', adminLeaguesRouter)
 
 // Configured leagues the caller can see (safe fields only — never access codes).
 app.get('/api/leagues', requireAuth, (req, res) => {
@@ -114,7 +120,7 @@ app.use('/api', adminRouter)
 
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)
-  if (IS_DEV) console.log('[dev] auth: log in with a league access code from config/leagues.json')
+  if (IS_DEV) console.log('[dev] open the app to set up the admin password / add leagues')
 
   // First-run: self-populate history for any league not yet ingested. Deferred
   // a few seconds so the health check goes green before the backfill load.

@@ -8,21 +8,19 @@
  */
 import type { DB } from '../db/index.js'
 import type { SleeperClient } from '../sleeper/client.js'
-import type { LeagueConfigEntry } from '../config/leagues.js'
-import { loadLeaguesConfig } from '../config/leagues.js'
+import type { LeagueRecord } from '../config/leagues.js'
 import { walkLeagueChain } from '../sleeper/chain.js'
 import { deriveCapabilities, type LeagueCapabilities } from './capabilities.js'
 import { deriveFinalRanks } from './brackets.js'
 import {
+  applyManagerAliases,
   finishSyncLog,
   getKv,
   replaceTradeAssets,
   resolveManager,
   setKv,
-  setManagerAlias,
   startSyncLog,
   upsertDraftPick,
-  upsertFamily,
   upsertLeagueSeason,
   upsertManager,
   upsertMatchup,
@@ -541,11 +539,10 @@ async function ingestSeason(
 export async function ingestFamily(
   client: SleeperClient,
   db: DB,
-  entry: LeagueConfigEntry,
+  entry: LeagueRecord,
   opts: IngestOptions,
 ): Promise<void> {
   const log = opts.log ?? console.log
-  const config = loadLeaguesConfig()
   const syncId = startSyncLog(db, entry.currentLeagueId, `${opts.mode}:${entry.slug}`)
 
   try {
@@ -553,19 +550,11 @@ export async function ingestFamily(
     const { entries: chain } = await walkLeagueChain(client, entry.currentLeagueId)
     if (chain.length === 0) throw new Error(`No leagues found for ${entry.slug}`)
 
-    const familyId = upsertFamily(db, {
-      slug: entry.slug,
-      displayName: entry.displayName,
-      leagueType: entry.type,
-      currentLeagueId: entry.currentLeagueId,
-      sortOrder: entry.sortOrder,
-    })
+    const familyId = entry.id
 
-    // Manager aliases from config (PLAN.md §7). Applied before ingest so
-    // resolveManager() collapses them everywhere.
-    for (const [stale, canonical] of Object.entries(config.managerAliases)) {
-      setManagerAlias(db, stale, canonical)
-    }
+    // Manager aliases (admin-managed, PLAN.md §7) — applied before ingest so
+    // resolveManager() collapses merged identities everywhere.
+    applyManagerAliases(db)
 
     const seasonsToIngest =
       opts.mode === 'incremental'
@@ -624,7 +613,7 @@ export async function ingestFamily(
 export async function ingestAll(
   client: SleeperClient,
   db: DB,
-  entries: LeagueConfigEntry[],
+  entries: LeagueRecord[],
   opts: IngestOptions,
 ): Promise<void> {
   await refreshPlayers(client, db, { log: opts.log })

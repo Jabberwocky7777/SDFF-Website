@@ -9,7 +9,9 @@
  * password gate isn't brute-forceable.
  */
 import { Router } from 'express'
-import { resolveAccessCode } from '../config/leagues.js'
+import { getLeagues, resolveAccessCode } from '../config/leagues.js'
+import { getDb } from '../db/index.js'
+import { isSetupComplete } from '../auth/admin.js'
 import {
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -67,11 +69,19 @@ router.post('/auth/logout', (_req, res) => {
 })
 
 router.get('/auth/session', (req, res) => {
+  const db = getDb()
+  const leagues = getLeagues(db)
+  const base = {
+    needsSetup: !isSetupComplete(db),
+    hasLeagues: leagues.length > 0,
+    /** The lowest-sort-order league — its full dynasty pages are the "home" site. */
+    flagshipSlug: leagues[0]?.slug ?? null,
+  }
   if (!req.auth) {
-    res.json({ authed: false, slugs: [], admin: false })
+    res.json({ authed: false, slugs: [], admin: false, ...base })
     return
   }
-  res.json({ authed: true, slugs: req.auth.slugs, admin: req.auth.admin })
+  res.json({ authed: true, slugs: req.auth.slugs, admin: req.auth.admin, ...base })
 })
 
 export default router

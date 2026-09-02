@@ -1,37 +1,17 @@
-# TrueNAS Scale: Apps → Discover Apps → Custom App → "Install via YAML" and
-# paste this file. Then edit the `LEAGUES_JSON` value below with your leagues.
-# Everything is managed from the TrueNAS UI — no SSH, no host files.
-#
-# To add a league later: Edit the app, update LEAGUES_JSON, Save. The server
-# self-populates history for any new league on the next start.
+# TrueNAS Scale: Apps -> Discover Apps -> Custom App -> "Install via YAML",
+# paste this file, Save. Then open the app in your browser to finish setup —
+# create a commissioner password and add your leagues from Settings. Nothing
+# else to configure here.
 services:
   sdff-web:
     image: ghcr.io/jabberwocky7777/sdff-website:latest
     ports:
-      - "7780:3001"          # host:container — change 7780 to whatever your reverse proxy expects
+      - "7780:3001"          # host:container — change 7780 to suit your reverse proxy
     environment:
-      # The entire league config, inline. Each league needs a numeric
-      # currentLeagueId and a short accessCode; adminCode unlocks everything.
-      # (Run `npm run leagues:discover -- --username <you>` locally to get IDs,
-      #  or copy them from the Sleeper app URL.)
-      LEAGUES_JSON: >-
-        {
-          "adminCode": "CHANGE-ME-ADMIN",
-          "leagues": [
-            { "slug": "sdff", "displayName": "Squad Dynasty Fantasy Football",
-              "currentLeagueId": "0000000000000000000", "type": "dynasty",
-              "sortOrder": 1, "accessCode": "SDFF", "theme": { "accent": "#E0B544" } },
-            { "slug": "redraft", "displayName": "The Redraft League",
-              "currentLeagueId": "0000000000000000000", "type": "redraft",
-              "sortOrder": 2, "accessCode": "RDFT", "theme": { "accent": "#059669" } }
-          ]
-        }
-      # TZ affects the sync scheduler's game-day windows.
-      TZ: America/New_York
+      TZ: America/New_York    # affects the sync scheduler's game-day windows
     volumes:
-      # Persistent app data: the SQLite history DB, JSON cache, session key,
-      # and admin-entered data (announcements/dues). TrueNAS creates and manages
-      # this volume — nothing to set up.
+      # SQLite history DB, cache, session key and admin-entered data.
+      # TrueNAS creates and manages this volume — nothing to set up.
       - sdff-data:/app/cache
     restart: unless-stopped
     healthcheck:

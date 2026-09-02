@@ -30,6 +30,7 @@ export default function NavBar() {
   const links = [
     ...(fullSite ? SDFF_LINKS : []),
     ...(showHub ? [{ to: '/l', label: fullSite ? 'Leagues' : 'Home' }] : []),
+    ...(admin ? [{ to: '/settings', label: 'Settings' }] : []),
   ]
 
   return (

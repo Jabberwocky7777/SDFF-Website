@@ -15,6 +15,7 @@ import { getLeagues } from '../config/leagues.js'
 import { ingestAll } from './ingest.js'
 import { resolveNflState } from './nflState.js'
 import { acquireSyncLock, releaseSyncLock, syncLockHolder } from './lock.js'
+import { kickBackfillQueue } from './trigger.js'
 
 let lastRun = 0
 let lastError: string | null = null
@@ -47,6 +48,7 @@ async function runIncremental(trigger: string): Promise<void> {
     console.error(`[scheduler] incremental (${trigger}) failed:`, err)
   } finally {
     releaseSyncLock()
+    kickBackfillQueue() // run any backfills that were queued while we held the lock
   }
 }
 

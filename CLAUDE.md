@@ -18,16 +18,18 @@ Leagues stay **siloed** for now: head-to-head and records are scoped to one
 league family. No cross-league aggregation UI yet (but `manager` is still a
 global table keyed by Sleeper `user_id`).
 
-Access is per-league and code-only — there is **no site password**. Each league
-has a short `accessCode`; entering it sets a signed session cookie unlocking that
-league. The top-level `adminCode` unlocks every league plus the admin panel.
+**No config files.** The commissioner sets a password on first run (`/setup`),
+then adds/manages leagues + access codes from the in-app **Settings** screen
+(`/settings`, `AdminSettings.tsx` → `/api/admin/*`). Leagues live in the
+`league_family` table (`server/config/leagues.ts` is the DB-backed registry).
+Admin password: scrypt in `kv` (`server/auth/admin.ts`). Session key:
+`SESSION_SECRET` or auto-generated to `<CACHE_DIR>/.session-secret`.
 
-Config comes from `LEAGUES_JSON` env (inline JSON or base64 — the prod/TrueNAS
-path) or `config/leagues.json` (local dev). Session signing key: `SESSION_SECRET`
-env or auto-generated to `<CACHE_DIR>/.session-secret`. On first start the server
-self-backfills history for any league with no `league_family` row
-(`AUTO_BACKFILL=0` disables). Everything is designed to be configured from the
-TrueNAS app UI — no host files, no `docker exec`.
+Adding a league validates the Sleeper ID and queues a background backfill
+(`server/sync/trigger.ts` — one at a time). `server/sync/lock.ts` is the shared
+mutex across backfill / scheduler / autobackfill. `AUTO_BACKFILL=0` disables the
+first-run self-backfill. `LEAGUES_JSON` env / `config/leagues.json` are imported
+once into the DB on a fresh install (`server/config/bootstrap.ts`), then ignored.
 
 ## Architecture rules
 - Historical/computed data -> SQLite. Live/volatile data -> file cache proxy.

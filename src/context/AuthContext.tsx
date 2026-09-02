@@ -1,15 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { getSession, login as apiLogin, logout as apiLogout } from '@/api/hub'
+import {
+  getSession,
+  login as apiLogin,
+  logout as apiLogout,
+  runSetup as apiSetup,
+} from '@/api/hub'
 
 interface AuthContextValue {
   authed: boolean
   checking: boolean
+  /** No admin password set yet — show the first-run setup screen. */
+  needsSetup: boolean
+  hasLeagues: boolean
+  flagshipSlug: string | null
   /** League slugs this session may view. */
   slugs: string[]
   admin: boolean
-  /** Enter an access code. Returns true on success. */
   login: (code: string) => Promise<boolean>
   logout: () => Promise<void>
+  setup: (password: string) => Promise<string | null>
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -20,16 +30,19 @@ export function useAuth(): AuthContextValue {
   return ctx
 }
 
-/** SDFF is the flagship league with the full site; other codes land in the hub. */
+/** The flagship (first) league has the full dynasty site; other codes land in the hub. */
 export function useHasFullSite(): boolean {
-  const { admin, slugs } = useAuth()
-  return admin || slugs.includes('sdff')
+  const { admin, slugs, flagshipSlug } = useAuth()
+  return admin || (!!flagshipSlug && slugs.includes(flagshipSlug))
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState(false)
   const [slugs, setSlugs] = useState<string[]>([])
   const [admin, setAdmin] = useState(false)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [hasLeagues, setHasLeagues] = useState(false)
+  const [flagshipSlug, setFlagshipSlug] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -38,6 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthed(s.authed)
       setSlugs(s.slugs ?? [])
       setAdmin(!!s.admin)
+      setNeedsSetup(!!s.needsSetup)
+      setHasLeagues(!!s.hasLeagues)
+      setFlagshipSlug(s.flagshipSlug ?? null)
     } catch {
       setAuthed(false)
       setSlugs([])
@@ -65,18 +81,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('sdff:auth-failure', handler)
   }, [])
 
-  const login = useCallback(async (code: string): Promise<boolean> => {
-    try {
-      const s = await apiLogin(code)
-      if (!s.authed) return false
-      setAuthed(true)
-      setSlugs(s.slugs ?? [])
-      setAdmin(!!s.admin)
-      return true
-    } catch {
-      return false
-    }
-  }, [])
+  const login = useCallback(
+    async (code: string): Promise<boolean> => {
+      try {
+        const s = await apiLogin(code)
+        if (!s.authed) return false
+        await refresh()
+        return true
+      } catch {
+        return false
+      }
+    },
+    [refresh],
+  )
+
+  const setup = useCallback(
+    async (password: string): Promise<string | null> => {
+      try {
+        await apiSetup(password)
+        await refresh()
+        return null
+      } catch (err) {
+        return err instanceof Error && 'status' in err ? 'Setup failed. Try again.' : 'Setup failed.'
+      }
+    },
+    [refresh],
+  )
 
   const logout = useCallback(async () => {
     try {
@@ -89,7 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ authed, checking, slugs, admin, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        authed,
+        checking,
+        needsSetup,
+        hasLeagues,
+        flagshipSlug,
+        slugs,
+        admin,
+        login,
+        logout,
+        setup,
+        refresh,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

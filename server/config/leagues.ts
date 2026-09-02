@@ -1,60 +1,36 @@
 /**
- * League configuration loader.
+ * League registry — DB-backed (`league_family` table).
  *
- * Source of truth for which leagues exist, their URL slugs, their Sleeper
- * league IDs, and their per-league access codes. Never hardcode league IDs
- * anywhere else, and always validate an incoming `:slug` against this config
- * before touching the Sleeper API (PLAN.md §6.7).
+ * The commissioner adds / edits / removes leagues and sets their access codes
+ * from the in-app admin settings screen; nothing is configured via files or env
+ * vars at runtime. `getLeagues()` is the synchronous source of truth used by
+ * routing, auth and sync. A small in-memory cache is invalidated on every write.
  *
- * `config/leagues.json` is the single source of auth: each league's short
- * `accessCode` (and the top-level `adminCode`) are the only credentials — there
- * is no site password. In production the file is mounted as a volume so leagues
- * and codes can be changed without rebuilding the image.
+ * Always validate an incoming `:slug` against this registry before touching the
+ * Sleeper API (PLAN.md §6.7).
  */
-import fs from 'fs'
-import path from 'path'
-import { z } from 'zod'
+import crypto from 'node:crypto'
+import { getDb, type DB } from '../db/index.js'
+import { verifyAdminPassword } from '../auth/admin.js'
 
-const LEAGUE_TYPES = ['dynasty', 'redraft', 'keeper', 'bestball'] as const
-
-const themeSchema = z
-  .object({
-    accent: z
-      .string()
-      .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'accent must be a hex color'),
-  })
-  .optional()
-
-const leagueSchema = z.object({
-  slug: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/, 'slug must be lowercase letters, digits and dashes'),
-  displayName: z.string().min(1),
-  currentLeagueId: z.string().regex(/^\d+$/, 'currentLeagueId must be a numeric Sleeper ID'),
-  type: z.enum(LEAGUE_TYPES),
-  sortOrder: z.number().int().default(0),
-  /** Short code a leaguemate enters to unlock this league. Set at setup time. */
-  accessCode: z.string().trim().min(3, 'accessCode must be at least 3 characters'),
-  theme: themeSchema,
-})
-
-const configSchema = z.object({
-  sleeperUsername: z.string().optional(),
-  leagues: z.array(leagueSchema).min(1),
-  /** Unlocks every league plus the admin panel. */
-  adminCode: z.string().min(1).optional(),
-  /** Stale Sleeper user_id -> canonical user_id it should merge into. */
-  managerAliases: z.record(z.string(), z.string()).default({}),
-  /** Sleeper user_id -> display name override. */
-  displayNameOverrides: z.record(z.string(), z.string()).default({}),
-})
-
+export const LEAGUE_TYPES = ['dynasty', 'redraft', 'keeper', 'bestball'] as const
 export type LeagueType = (typeof LEAGUE_TYPES)[number]
-export type LeagueConfigEntry = z.infer<typeof leagueSchema>
-export type LeaguesConfig = z.infer<typeof configSchema>
 
-/** Fields safe to expose to the browser — never the access codes. */
+export interface LeagueRecord {
+  id: number
+  slug: string
+  displayName: string
+  type: LeagueType
+  currentLeagueId: string
+  sortOrder: number
+  accessCode: string
+  themeAccent: string | null
+  /** Convenience for callers that expect the old `theme` shape. */
+  theme: { accent: string } | null
+  addedAt: number | null
+}
+
+/** Fields safe to expose to the browser — never the access code. */
 export interface PublicLeague {
   slug: string
   displayName: string
@@ -63,150 +39,233 @@ export interface PublicLeague {
   theme?: { accent: string }
 }
 
-const CONFIG_PATH =
-  process.env.LEAGUES_CONFIG_PATH ?? path.join(process.cwd(), 'config', 'leagues.json')
-
-let cached: LeaguesConfig | null = null
-
-/** Drop helper keys like `$comment` before validation. */
-function stripComments(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stripComments)
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([k]) => !k.startsWith('$'))
-        .map(([k, v]) => [k, stripComments(v)]),
-    )
-  }
-  return value
+interface Row {
+  id: number
+  slug: string
+  display_name: string
+  league_type: string
+  current_league_id: string
+  sort_order: number
+  access_code: string
+  theme_accent: string | null
+  added_at: number | null
 }
 
-/**
- * Where the config comes from, in priority order:
- *   1. LEAGUES_JSON env var — the whole config inline (raw JSON or base64).
- *      This is the TrueNAS-friendly path: everything editable in the app UI.
- *   2. config/leagues.json file (or LEAGUES_CONFIG_PATH) — for local dev or a
- *      volume-mounted file.
- */
-function readRawConfig(): { raw: string; source: string } {
-  const inline = process.env.LEAGUES_JSON?.trim()
-  if (inline) {
-    if (inline.startsWith('{')) return { raw: inline, source: 'LEAGUES_JSON env' }
-    try {
-      const decoded = Buffer.from(inline, 'base64').toString('utf8').trim()
-      if (decoded.startsWith('{')) return { raw: decoded, source: 'LEAGUES_JSON env (base64)' }
-    } catch {
-      /* fall through to the error below */
-    }
-    throw new Error('LEAGUES_JSON is set but is neither JSON nor base64-encoded JSON.')
-  }
+let cache: LeagueRecord[] | null = null
 
-  try {
-    return { raw: fs.readFileSync(CONFIG_PATH, 'utf8'), source: CONFIG_PATH }
-  } catch {
-    throw new Error(
-      `No league config. Set the LEAGUES_JSON env var to the config JSON, or create ` +
-        `${CONFIG_PATH} (copy config/leagues.example.json). Each league needs an accessCode.`,
-    )
+export function invalidateLeagueCache(): void {
+  cache = null
+}
+/** Back-compat alias. */
+export const clearLeaguesConfigCache = invalidateLeagueCache
+
+function toRecord(r: Row): LeagueRecord {
+  return {
+    id: r.id,
+    slug: r.slug,
+    displayName: r.display_name,
+    type: (LEAGUE_TYPES as readonly string[]).includes(r.league_type)
+      ? (r.league_type as LeagueType)
+      : 'redraft',
+    currentLeagueId: r.current_league_id,
+    sortOrder: r.sort_order,
+    accessCode: r.access_code,
+    themeAccent: r.theme_accent,
+    theme: r.theme_accent ? { accent: r.theme_accent } : null,
+    addedAt: r.added_at,
   }
 }
 
-export function loadLeaguesConfig(): LeaguesConfig {
-  if (cached) return cached
-
-  const { raw, source } = readRawConfig()
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch (err) {
-    throw new Error(`${source} is not valid JSON: ${(err as Error).message}`, { cause: err })
-  }
-
-  const result = configSchema.safeParse(stripComments(parsed))
-  if (!result.success) {
-    throw new Error(
-      `${source} failed validation:\n${z.prettifyError(result.error)}`,
-    )
-  }
-
-  const slugs = new Set<string>()
-  const codes = new Set<string>()
-  for (const league of result.data.leagues) {
-    if (slugs.has(league.slug)) {
-      throw new Error(`${source}: duplicate league slug "${league.slug}"`)
-    }
-    slugs.add(league.slug)
-    if (codes.has(league.accessCode)) {
-      throw new Error(`${source}: two leagues share the access code "${league.accessCode}"`)
-    }
-    codes.add(league.accessCode)
-  }
-  if (result.data.adminCode && codes.has(result.data.adminCode)) {
-    throw new Error(`${source}: adminCode must not match a league accessCode`)
-  }
-  if (!result.data.adminCode) {
-    console.warn(
-      `[leagues] no adminCode set in ${source} — the admin panel and cross-league access are disabled`,
-    )
-  }
-
-  cached = result.data
-  return cached
+export function getLeagues(db: DB = getDb()): LeagueRecord[] {
+  if (cache) return cache
+  const rows = db
+    .prepare(`SELECT * FROM league_family ORDER BY sort_order, display_name`)
+    .all() as Row[]
+  cache = rows.map(toRecord)
+  return cache
 }
 
-/** Test/hot-reload helper. */
-export function clearLeaguesConfigCache(): void {
-  cached = null
-}
-
-export function getLeagues(): LeagueConfigEntry[] {
-  return [...loadLeaguesConfig().leagues].sort((a, b) => a.sortOrder - b.sortOrder)
-}
-
-export function getLeague(slug: string): LeagueConfigEntry | undefined {
-  return loadLeaguesConfig().leagues.find((l) => l.slug === slug)
+export function getLeague(slug: string): LeagueRecord | undefined {
+  return getLeagues().find((l) => l.slug === slug)
 }
 
 export function isKnownSlug(slug: string): boolean {
   return getLeague(slug) !== undefined
 }
 
-export function toPublicLeague(league: LeagueConfigEntry): PublicLeague {
+export function toPublicLeague(l: LeagueRecord): PublicLeague {
   return {
-    slug: league.slug,
-    displayName: league.displayName,
-    type: league.type,
-    sortOrder: league.sortOrder,
-    theme: league.theme,
+    slug: l.slug,
+    displayName: l.displayName,
+    type: l.type,
+    sortOrder: l.sortOrder,
+    theme: l.theme ?? undefined,
   }
 }
 
+// ── Mutations (admin) ───────────────────────────────────────────────────────
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'league'
+  )
+}
+
+function uniqueSlug(db: DB, base: string, ignoreId?: number): string {
+  const taken = new Set(
+    (
+      db.prepare(`SELECT id, slug FROM league_family`).all() as Array<{ id: number; slug: string }>
+    )
+      .filter((r) => r.id !== ignoreId)
+      .map((r) => r.slug),
+  )
+  if (!taken.has(base)) return base
+  for (let i = 2; i < 100; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
+  return `${base}-${Date.now()}`
+}
+
+export function generateAccessCode(db: DB): string {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no ambiguous chars
+  const existing = new Set(
+    (db.prepare(`SELECT access_code FROM league_family`).all() as Array<{ access_code: string }>).map(
+      (r) => r.access_code,
+    ),
+  )
+  for (let attempt = 0; attempt < 50; attempt++) {
+    let code = ''
+    for (let i = 0; i < 4; i++) code += alphabet[crypto.randomInt(alphabet.length)]
+    if (!existing.has(code)) return code
+  }
+  return crypto.randomBytes(3).toString('hex').toUpperCase()
+}
+
+export interface AddLeagueInput {
+  currentLeagueId: string
+  displayName: string
+  type: LeagueType
+  accessCode?: string
+  slug?: string
+  themeAccent?: string | null
+  sortOrder?: number
+}
+
+export function addLeague(input: AddLeagueInput, db: DB = getDb()): LeagueRecord {
+  const code = (input.accessCode ?? generateAccessCode(db)).trim().toUpperCase()
+  assertCodeUsable(db, code)
+
+  const slug = uniqueSlug(db, input.slug ? slugify(input.slug) : slugify(input.displayName))
+  const maxOrder =
+    (db.prepare(`SELECT MAX(sort_order) m FROM league_family`).get() as { m: number | null }).m ?? 0
+
+  const info = db
+    .prepare(
+      `INSERT INTO league_family
+         (slug, display_name, league_type, current_league_id, sort_order, access_code, theme_accent, added_at)
+       VALUES (@slug, @displayName, @type, @currentLeagueId, @sortOrder, @accessCode, @themeAccent, @addedAt)`,
+    )
+    .run({
+      slug,
+      displayName: input.displayName.trim(),
+      type: input.type,
+      currentLeagueId: input.currentLeagueId,
+      sortOrder: input.sortOrder ?? maxOrder + 1,
+      accessCode: code,
+      themeAccent: input.themeAccent ?? null,
+      addedAt: Date.now(),
+    })
+
+  invalidateLeagueCache()
+  return getLeagues(db).find((l) => l.id === Number(info.lastInsertRowid))!
+}
+
+export interface UpdateLeagueInput {
+  displayName?: string
+  type?: LeagueType
+  accessCode?: string
+  currentLeagueId?: string
+  themeAccent?: string | null
+  sortOrder?: number
+}
+
+export function updateLeague(slug: string, patch: UpdateLeagueInput, db: DB = getDb()): LeagueRecord {
+  const existing = getLeague(slug)
+  if (!existing) throw new Error(`Unknown league "${slug}"`)
+
+  if (patch.accessCode !== undefined) {
+    const code = patch.accessCode.trim().toUpperCase()
+    assertCodeUsable(db, code, existing.id)
+    patch.accessCode = code
+  }
+
+  const fields: string[] = []
+  const params: Record<string, unknown> = { slug }
+  const map: Record<string, string> = {
+    displayName: 'display_name',
+    type: 'league_type',
+    accessCode: 'access_code',
+    currentLeagueId: 'current_league_id',
+    themeAccent: 'theme_accent',
+    sortOrder: 'sort_order',
+  }
+  for (const [k, col] of Object.entries(map)) {
+    const v = (patch as Record<string, unknown>)[k]
+    if (v !== undefined) {
+      fields.push(`${col} = @${k}`)
+      params[k] = typeof v === 'string' ? v.trim() : v
+    }
+  }
+  if (fields.length) {
+    db.prepare(`UPDATE league_family SET ${fields.join(', ')} WHERE slug = @slug`).run(params)
+    invalidateLeagueCache()
+  }
+  return getLeague(slug)!
+}
+
+export function removeLeague(slug: string, db: DB = getDb()): void {
+  // FK cascade drops every season / matchup / trade / draft row for this family.
+  db.prepare(`DELETE FROM league_family WHERE slug = ?`).run(slug)
+  invalidateLeagueCache()
+}
+
+function assertCodeUsable(db: DB, code: string, ignoreId?: number): void {
+  if (code.length < 3) throw new Error('Access code must be at least 3 characters.')
+  const clash = (
+    db.prepare(`SELECT id FROM league_family WHERE access_code = ?`).all(code) as Array<{
+      id: number
+    }>
+  ).some((r) => r.id !== ignoreId)
+  if (clash) throw new Error(`Access code "${code}" is already used by another league.`)
+}
+
+// ── Access-code resolution (login) ──────────────────────────────────────────
+
 /**
- * Resolve an access code to the set of league slugs it unlocks.
- * The admin code unlocks everything. Returns `{ admin, slugs }`.
+ * Resolve a login code: the admin password unlocks everything; a league's
+ * access code unlocks that league.
  */
 export function resolveAccessCode(code: string): { admin: boolean; slugs: string[] } {
-  const config = loadLeaguesConfig()
+  const db = getDb()
   const trimmed = code.trim()
   if (!trimmed) return { admin: false, slugs: [] }
 
-  if (config.adminCode && timingSafeEqual(trimmed, config.adminCode)) {
-    return { admin: true, slugs: config.leagues.map((l) => l.slug) }
+  if (verifyAdminPassword(db, trimmed)) {
+    return { admin: true, slugs: getLeagues(db).map((l) => l.slug) }
   }
 
-  const slugs = config.leagues
-    .filter((l) => timingSafeEqual(trimmed, l.accessCode))
+  const upper = trimmed.toUpperCase()
+  const slugs = getLeagues(db)
+    .filter((l) => timingSafeEqual(l.accessCode, upper))
     .map((l) => l.slug)
   return { admin: false, slugs }
 }
 
-/** Constant-time string compare to avoid leaking code length/prefix via timing. */
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let mismatch = 0
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return mismatch === 0
 }

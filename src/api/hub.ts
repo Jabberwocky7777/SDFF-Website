@@ -20,12 +20,15 @@ async function hubFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-// ── Auth ────────────────────────────────────────────────────────────────────
+// ── Auth & setup ────────────────────────────────────────────────────────────
 
 export interface SessionInfo {
   authed: boolean
   slugs: string[]
   admin: boolean
+  needsSetup: boolean
+  hasLeagues: boolean
+  flagshipSlug: string | null
 }
 
 export const getSession = () => hubFetch<SessionInfo>('/auth/session')
@@ -37,6 +40,98 @@ export const login = (code: string) =>
   })
 
 export const logout = () => hubFetch<{ authed: false }>('/auth/logout', { method: 'POST' })
+
+export const runSetup = (password: string) =>
+  hubFetch<{ authed: boolean; admin: boolean }>('/setup', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  })
+
+// ── Admin: leagues & settings ───────────────────────────────────────────────
+
+export interface LeagueSyncStatus {
+  slug: string
+  syncing: boolean
+  queued: boolean
+  seasons: number
+  matchups: number
+  lastSync: { at: number | null; status: string | null; error: string | null }
+}
+
+export interface AdminLeague {
+  slug: string
+  displayName: string
+  type: HubLeague['type']
+  currentLeagueId: string
+  accessCode: string
+  themeAccent: string | null
+  sortOrder: number
+  addedAt: number | null
+  sync: LeagueSyncStatus | null
+}
+
+export const getAdminLeagues = () => hubFetch<AdminLeague[]>('/admin/leagues')
+
+export const suggestAccessCode = () =>
+  hubFetch<{ code: string }>('/admin/leagues/suggest-code')
+
+export interface DiscoveredLeague {
+  currentLeagueId: string
+  name: string
+  latestSeason: number
+  seasonsAvailable: number
+  seasonRange: [number, number] | null
+  type: 'dynasty' | 'keeper' | 'redraft'
+  alreadyAdded: boolean
+}
+
+export const discoverLeagues = (username?: string) =>
+  hubFetch<DiscoveredLeague[]>(
+    `/admin/leagues/discover${username ? `?username=${encodeURIComponent(username)}` : ''}`,
+  )
+
+export const addLeague = (input: {
+  currentLeagueId: string
+  displayName?: string
+  type?: HubLeague['type']
+  accessCode?: string
+  themeAccent?: string | null
+}) => hubFetch<AdminLeague>('/admin/leagues', { method: 'POST', body: JSON.stringify(input) })
+
+export const updateLeague = (
+  slug: string,
+  patch: Partial<{
+    displayName: string
+    type: HubLeague['type']
+    accessCode: string
+    currentLeagueId: string
+    themeAccent: string | null
+    sortOrder: number
+  }>,
+) => hubFetch<AdminLeague>(`/admin/leagues/${slug}`, { method: 'PATCH', body: JSON.stringify(patch) })
+
+export const deleteLeague = (slug: string) =>
+  hubFetch<{ ok: boolean }>(`/admin/leagues/${slug}`, { method: 'DELETE' })
+
+export const resyncLeague = (slug: string, force = false) =>
+  hubFetch<{ state: 'started' | 'queued'; sync: LeagueSyncStatus }>(
+    `/admin/leagues/${slug}/resync`,
+    { method: 'POST', body: JSON.stringify({ force }) },
+  )
+
+export const getAdminSettings = () => hubFetch<{ sleeperUsername: string }>('/admin/settings')
+
+export const saveAdminSettings = (sleeperUsername: string) =>
+  hubFetch<{ sleeperUsername: string }>('/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ sleeperUsername }),
+  })
+
+export const changeAdminPassword = (current: string, next: string) =>
+  hubFetch<{ ok: boolean }>('/admin/password', {
+    method: 'POST',
+    body: JSON.stringify({ current, next }),
+  })
 
 // ── Leagues ─────────────────────────────────────────────────────────────────
 

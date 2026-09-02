@@ -71,7 +71,7 @@ export default function SplashScreen() {
           </form>
 
           <p className="mt-4 text-small text-mutedLow leading-relaxed">
-            Each league has its own code. The commissioner's code unlocks every league.
+            Each league has its own code. Commissioners: use your admin password here.
           </p>
         </div>
       </div>
