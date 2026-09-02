@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePlayers } from '@/hooks/usePlayers'
 import { parseFlockCsv, normalizePlayerName } from '@/lib/parseFlockCsv'
-import { apiFetch, AUTH_KEY, ApiError } from '@/api/client'
+import { apiFetch, ApiError } from '@/api/client'
 import { API_BASE } from '@/config'
 import type { Position } from '@/lib/parseFlockCsv'
 import type { SleeperDraftPick } from '@/hooks/useDraftPicks'
@@ -74,14 +74,10 @@ function computeDynastyProfile(pos: Position, age: number | null): DynastyProfil
 
 async function apiTextFetch(path: string): Promise<string> {
   const url = `${API_BASE}${path}`
-  const password = sessionStorage.getItem(AUTH_KEY)
-
-  const headers: Record<string, string> = { Accept: 'text/plain' }
-  if (password) {
-    headers['Authorization'] = 'Basic ' + btoa(`sdff:${password}`)
-  }
-
-  const res = await fetch(url, { headers })
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: { Accept: 'text/plain' },
+  })
 
   if (res.status === 401) {
     window.dispatchEvent(new CustomEvent('sdff:auth-failure'))

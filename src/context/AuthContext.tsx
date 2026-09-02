@@ -1,77 +1,95 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
-import { AUTH_KEY } from '@/api/client'
-import { API_BASE } from '@/config'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { getSession, login as apiLogin, logout as apiLogout } from '@/api/hub'
 
 interface AuthContextValue {
   authed: boolean
   checking: boolean
-  setPassword: (pwd: string) => Promise<boolean>
-  clearPassword: () => void
+  /** League slugs this session may view. */
+  slugs: string[]
+  admin: boolean
+  /** Enter an access code. Returns true on success. */
+  login: (code: string) => Promise<boolean>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
 
-async function validatePassword(pwd: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/me`, {
-      headers: { Authorization: 'Basic ' + btoa(`sdff:${pwd}`) },
-    })
-    return res.ok
-  } catch {
-    return false
-  }
+/** SDFF is the flagship league with the full site; other codes land in the hub. */
+export function useHasFullSite(): boolean {
+  const { admin, slugs } = useAuth()
+  return admin || slugs.includes('sdff')
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState(false)
+  const [slugs, setSlugs] = useState<string[]>([])
+  const [admin, setAdmin] = useState(false)
   const [checking, setChecking] = useState(true)
 
-  // On mount: validate stored password
-  useEffect(() => {
-    const stored = sessionStorage.getItem(AUTH_KEY)
-    if (!stored) {
-      setChecking(false)
-      return
+  const refresh = useCallback(async () => {
+    try {
+      const s = await getSession()
+      setAuthed(s.authed)
+      setSlugs(s.slugs ?? [])
+      setAdmin(!!s.admin)
+    } catch {
+      setAuthed(false)
+      setSlugs([])
+      setAdmin(false)
     }
-    validatePassword(stored).then((ok) => {
-      setAuthed(ok)
-      if (!ok) sessionStorage.removeItem(AUTH_KEY)
-      setChecking(false)
-    })
   }, [])
 
-  // Listen for auth failures from apiFetch
+  useEffect(() => {
+    let active = true
+    refresh().then(() => {
+      if (active) setChecking(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [refresh])
+
   useEffect(() => {
     const handler = () => {
-      sessionStorage.removeItem(AUTH_KEY)
       setAuthed(false)
+      setSlugs([])
+      setAdmin(false)
     }
     window.addEventListener('sdff:auth-failure', handler)
     return () => window.removeEventListener('sdff:auth-failure', handler)
   }, [])
 
-  const setPassword = useCallback(async (pwd: string): Promise<boolean> => {
-    const ok = await validatePassword(pwd)
-    if (ok) {
-      sessionStorage.setItem(AUTH_KEY, pwd)
+  const login = useCallback(async (code: string): Promise<boolean> => {
+    try {
+      const s = await apiLogin(code)
+      if (!s.authed) return false
       setAuthed(true)
+      setSlugs(s.slugs ?? [])
+      setAdmin(!!s.admin)
+      return true
+    } catch {
+      return false
     }
-    return ok
   }, [])
 
-  const clearPassword = useCallback(() => {
-    sessionStorage.removeItem(AUTH_KEY)
-    setAuthed(false)
+  const logout = useCallback(async () => {
+    try {
+      await apiLogout()
+    } finally {
+      setAuthed(false)
+      setSlugs([])
+      setAdmin(false)
+    }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ authed, checking, setPassword, clearPassword }}>
+    <AuthContext.Provider value={{ authed, checking, slugs, admin, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -7,22 +7,32 @@
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build",
-    "build:server": "tsc --project tsconfig.node.json",
+    "build:server": "tsc --project tsconfig.node.json && node scripts/copy-server-assets.mjs",
     "build:all": "npm run build && npm run build:server",
     "start": "node dist-server/index.js",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "tsx server/scripts/migrate.ts",
+    "leagues:discover": "tsx server/scripts/discover-leagues.ts",
+    "sync:backfill": "tsx server/scripts/sync-backfill.ts",
+    "sync:incremental": "tsx server/scripts/sync-incremental.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.11",
+    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "node-cron": "^4.6.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1"
+    "react-router-dom": "^7.15.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.12.3",
@@ -39,6 +49,7 @@
     "tsx": "^4.22.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^4.1.11"
   }
 }

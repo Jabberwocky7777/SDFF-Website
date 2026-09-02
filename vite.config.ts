@@ -9,15 +9,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            const creds = Buffer.from(`sdff:${process.env.SITE_PASSWORD ?? 'SDFF'}`).toString('base64')
-            proxyReq.setHeader('Authorization', `Basic ${creds}`)
-          })
-        },
-      },
+      // API + session cookie both flow through here to the Express server.
+      // Log in once with a league access code; the cookie persists.
+      '/api': { target: 'http://localhost:3001' },
     },
   },
 })
