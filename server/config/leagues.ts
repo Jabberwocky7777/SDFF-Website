@@ -113,7 +113,7 @@ export function loadLeaguesConfig(): LeaguesConfig {
   try {
     raw = fs.readFileSync(CONFIG_PATH, 'utf8')
   } catch {
-    raw = null
+    /* file absent — fall back to the LEAGUE_ID shim below */
   }
 
   if (raw == null) {
@@ -132,7 +132,7 @@ export function loadLeaguesConfig(): LeaguesConfig {
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new Error(`${CONFIG_PATH} is not valid JSON: ${(err as Error).message}`)
+    throw new Error(`${CONFIG_PATH} is not valid JSON: ${(err as Error).message}`, { cause: err })
   }
 
   const result = configSchema.safeParse(stripComments(parsed))

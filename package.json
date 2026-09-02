@@ -13,7 +13,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "db:migrate": "tsx server/scripts/migrate.ts",
-    "leagues:discover": "tsx server/scripts/discover-leagues.ts"
+    "leagues:discover": "tsx server/scripts/discover-leagues.ts",
+    "sync:backfill": "tsx server/scripts/sync-backfill.ts",
+    "sync:incremental": "tsx server/scripts/sync-incremental.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.11",
@@ -46,6 +50,7 @@
     "tsx": "^4.22.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^4.1.11"
   }
 }

@@ -81,13 +81,13 @@ CREATE TABLE IF NOT EXISTS matchup (
   result               TEXT,                -- 'W' | 'L' | 'T' | NULL
   is_playoff           INTEGER NOT NULL DEFAULT 0,
   is_consolation       INTEGER NOT NULL DEFAULT 0,
-  is_median            INTEGER NOT NULL DEFAULT 0,  -- synthetic median-scoring row
+  median_result        TEXT,                -- 'W' | 'L' vs the weekly median (median-scoring leagues)
   starters_json        TEXT,
   starters_points_json TEXT,
   players_json         TEXT,
   players_points_json  TEXT,
   optimal_points       REAL,                -- computed (PLAN.md §4 coaching efficiency)
-  PRIMARY KEY (league_id, week, roster_id, is_median)
+  PRIMARY KEY (league_id, week, roster_id)
 );
 CREATE INDEX IF NOT EXISTS idx_matchup_user ON matchup(user_id);
 CREATE INDEX IF NOT EXISTS idx_matchup_league_week ON matchup(league_id, week);
@@ -191,6 +191,18 @@ CREATE TABLE IF NOT EXISTS draft_pick (
 );
 CREATE INDEX IF NOT EXISTS idx_draft_pick_league ON draft_pick(league_id);
 CREATE INDEX IF NOT EXISTS idx_draft_pick_player ON draft_pick(player_id);
+
+-- Raw traded-pick ownership per league-season (GET /league/{id}/traded_picks).
+-- Feeds trade-tree pick resolution (PLAN.md §13.4).
+CREATE TABLE IF NOT EXISTS traded_pick (
+  league_id                TEXT NOT NULL REFERENCES league_season(league_id) ON DELETE CASCADE,
+  pick_season              TEXT NOT NULL,
+  round                    INTEGER NOT NULL,
+  original_roster_id       INTEGER NOT NULL,
+  current_owner_roster_id  INTEGER NOT NULL,
+  previous_owner_roster_id INTEGER,
+  PRIMARY KEY (league_id, pick_season, round, original_roster_id)
+);
 
 -- Auto-computed season awards (PLAN.md §12.5). Trophy case on manager profiles.
 CREATE TABLE IF NOT EXISTS award (

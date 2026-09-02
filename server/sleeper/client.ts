@@ -15,7 +15,6 @@ import {
   leagueSchema,
   matchupSchema,
   nflStateSchema,
-  playerSchema,
   rosterSchema,
   transactionSchema,
   tradedPickSchema,

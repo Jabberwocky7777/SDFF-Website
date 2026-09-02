@@ -8,6 +8,7 @@ import draftRouter from './routes/draft.js'
 import adminRouter from './routes/admin.js'
 import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
 import { getDb } from './db/index.js'
+import { startScheduler } from './sync/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -33,6 +34,7 @@ try {
 try {
   getDb()
   console.log('[startup] SQLite ready')
+  startScheduler()
 } catch (err) {
   console.error('[startup] SQLite init failed (historical routes will be unavailable):', err)
 }
