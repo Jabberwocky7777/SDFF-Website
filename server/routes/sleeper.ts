@@ -6,7 +6,12 @@ const router = Router()
 
 // Legacy single-league routes target the default (first) configured league
 // unless LEAGUE_ID is explicitly set. PLAN.md §3 backward-compat.
-const LEAGUE_ID = process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId
+// Resolved lazily (per request) so a missing config surfaces as the clean
+// startup error in index.ts rather than an import-time crash.
+let cachedLeagueId: string | undefined
+function LEAGUE_ID(): string {
+  return (cachedLeagueId ??= process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId)
+}
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 
 const GAME_DAYS = new Set([0, 1, 4]) // Sun, Mon, Thu (JS day-of-week)
@@ -51,21 +56,21 @@ async function cached(
 }
 
 router.get('/league', (req, res) => {
-  void cached(req, res, 'league', `${SLEEPER_BASE}/league/${LEAGUE_ID}`, 30 * 60)
+  void cached(req, res, 'league', `${SLEEPER_BASE}/league/${LEAGUE_ID()}`, 30 * 60)
 })
 
 router.get('/users', (req, res) => {
-  void cached(req, res, 'users', `${SLEEPER_BASE}/league/${LEAGUE_ID}/users`, 30 * 60)
+  void cached(req, res, 'users', `${SLEEPER_BASE}/league/${LEAGUE_ID()}/users`, 30 * 60)
 })
 
 router.get('/rosters', (req, res) => {
-  void cached(req, res, 'rosters', `${SLEEPER_BASE}/league/${LEAGUE_ID}/rosters`, 30 * 60)
+  void cached(req, res, 'rosters', `${SLEEPER_BASE}/league/${LEAGUE_ID()}/rosters`, 30 * 60)
 })
 
 router.get('/matchups/:week', (req, res) => {
   const { week } = req.params
   const ttl = isGameDay() ? 5 * 60 : 30 * 60
-  void cached(req, res, `matchups_${week}`, `${SLEEPER_BASE}/league/${LEAGUE_ID}/matchups/${week}`, ttl)
+  void cached(req, res, `matchups_${week}`, `${SLEEPER_BASE}/league/${LEAGUE_ID()}/matchups/${week}`, ttl)
 })
 
 router.get('/state', (req, res) => {
@@ -78,13 +83,13 @@ router.get('/players', (req, res) => {
 
 // ── Rookie pick trades ────────────────────────────────────────────────────────
 router.get('/league/traded-picks', (req, res) => {
-  void cached(req, res, 'traded_picks', `${SLEEPER_BASE}/league/${LEAGUE_ID}/traded_picks`, 5 * 60)
+  void cached(req, res, 'traded_picks', `${SLEEPER_BASE}/league/${LEAGUE_ID()}/traded_picks`, 5 * 60)
 })
 
 // ── Transactions by week ──────────────────────────────────────────────────────
 router.get('/league/transactions/:week', (req, res) => {
   const { week } = req.params
-  void cached(req, res, `transactions_${week}`, `${SLEEPER_BASE}/league/${LEAGUE_ID}/transactions/${week}`, 2 * 60)
+  void cached(req, res, `transactions_${week}`, `${SLEEPER_BASE}/league/${LEAGUE_ID()}/transactions/${week}`, 2 * 60)
 })
 
 // ── Draft ID shortcut (reuses cached league data) ────────────────────────────
@@ -96,7 +101,7 @@ router.get('/league/draft-id', async (req, res) => {
     return
   }
   try {
-    const data = await sleeperFetch(`${SLEEPER_BASE}/league/${LEAGUE_ID}`) as { draft_id?: string }
+    const data = await sleeperFetch(`${SLEEPER_BASE}/league/${LEAGUE_ID()}`) as { draft_id?: string }
     writeCache('league', data)
     res.json({ draftId: data.draft_id ?? null })
   } catch (err) {
