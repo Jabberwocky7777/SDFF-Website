@@ -11,6 +11,7 @@ import leaguesRouter from './routes/leagues.js'
 import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
 import { getDb } from './db/index.js'
 import { startScheduler } from './sync/scheduler.js'
+import { autoBackfillIfNeeded } from './sync/autobackfill.js'
 import {
   attachAuth,
   requireAuth,
@@ -114,4 +115,14 @@ app.use('/api', adminRouter)
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)
   if (IS_DEV) console.log('[dev] auth: log in with a league access code from config/leagues.json')
+
+  // First-run: self-populate history for any league not yet ingested. Deferred
+  // a few seconds so the health check goes green before the backfill load.
+  setTimeout(() => {
+    try {
+      autoBackfillIfNeeded(getDb())
+    } catch (err) {
+      console.error('[autobackfill] could not start:', err)
+    }
+  }, 8000)
 })

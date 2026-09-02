@@ -27,108 +27,74 @@ cp config/leagues.example.json config/leagues.json
 #    real currentLeagueId + a short accessCode for each league, and an adminCode
 npm run leagues:discover -- --username <your_sleeper_username>
 
-# 3. Build the history DB (needs the real IDs from step 2)
-npm run sync:backfill -- --league all    # one-time, ~1-2 min
-
-# 4. Run it (two terminals)
+# 3. Run it (two terminals)
 npm run dev          # Vite frontend  → http://localhost:5173
 npm run dev:server   # Express backend → http://localhost:3001
 ```
+
+On first start the server backfills every league's history in the background
+(~1-2 min). To do it upfront instead: `npm run sync:backfill -- --league all`.
 
 Open the site and log in with a league's `accessCode` (or the `adminCode`).
 
 ## TrueNAS Scale Deployment
 
+Everything is done from the **TrueNAS web UI** — no SSH, no host files.
+
 The image publishes to `ghcr.io/jabberwocky7777/sdff-website:latest` on every
 push to `main`.
 
-### What you need on the host
+### Install
 
-| Path | What | Dataset? |
-|---|---|---|
-| `/app/cache` | SQLite history DB (`sdff.db`), JSON cache, auto-generated `.session-secret` | **Yes** — so the DB is snapshotted. Reuse your existing sdff cache dataset. |
-| `/app/config` | `leagues.json` (league IDs + access codes) | No — a plain directory is fine. Must contain `leagues.json` **before first start**. |
+1. **Apps → Discover Apps → Custom App → Install via YAML.**
+2. Paste [`docker-compose.yml`](docker-compose.yml) from this repo.
+3. In the pasted YAML, edit the `LEAGUES_JSON` value: for each league set a real
+   numeric `currentLeagueId`, a short `accessCode` (min 3 chars), and set
+   `adminCode`. (IDs come from the Sleeper app URL, or run
+   `npm run leagues:discover -- --username <you>` locally.)
+4. Adjust the published port (`7780`) and `TZ` if needed. Save.
 
-**No new dataset is required** if you already have a cache dataset from the
-single-league version — the DB just lands alongside the JSON files. You only need
-a `config` directory (can live next to `docker-compose.yml`).
+That's it. On first start the server **self-populates** history for every
+configured league (a few minutes in the background — the app is usable
+immediately, history pages fill in as they load). A named volume (`sdff-data`)
+is created and managed by TrueNAS for the SQLite DB, cache, session key and
+admin-entered data; it survives updates and redeploys.
 
-### First-time setup
-
-```bash
-mkdir -p /mnt/tank/apps/sdff/config
-cd /mnt/tank/apps/sdff
-
-curl -O https://raw.githubusercontent.com/Jabberwocky7777/SDFF-Website/main/docker-compose.yml
-curl -o config/leagues.json https://raw.githubusercontent.com/Jabberwocky7777/SDFF-Website/main/config/leagues.example.json
-nano config/leagues.json    # set currentLeagueId + accessCode for each league, and adminCode
-
-touch .env                   # compose expects the file to exist; it can stay empty
-```
-
-Every runtime setting has a sane default, so `.env` can be empty. Populate it
-only to override something — see [`.env.example`](.env.example).
-
-Edit `docker-compose.yml` so the two volume paths match your host:
-
-```yaml
-volumes:
-  - /mnt/tank/apps/sdff-cache:/app/cache      # your existing cache dataset
-  - /mnt/tank/apps/sdff/config:/app/config    # the directory holding leagues.json
-```
-
-Start it:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-**Populate history (one-time).** The DB starts empty — run the backfill inside
-the container:
-
-```bash
-docker compose exec sdff-web node dist-server/scripts/sync-backfill.js --league all
-```
-
-After that, an in-process scheduler keeps the current season fresh (hourly, plus
-every 15 min on game days). Site is on port `3001` inside the container — point
-your reverse proxy at the published host port (`7780` in the sample compose).
+Point your reverse proxy at the published host port. Log in with a league's
+`accessCode` (or the `adminCode`).
 
 ### Adding a league later
 
-Edit `config/leagues.json` (add the entry with its `accessCode`),
-`docker compose restart sdff-web`, then:
-
-```bash
-docker compose exec sdff-web node dist-server/scripts/sync-backfill.js --league <slug>
-```
+**Edit** the app in the TrueNAS UI, add the league object to `LEAGUES_JSON`,
+**Save**. The server backfills the new league's history automatically on the
+next start. Nothing else to do.
 
 ### Updating
 
-```bash
-cd /mnt/tank/apps/sdff && docker compose pull && docker compose up -d
-```
+**Apps → sdff-web → Update** (or it auto-updates if you enabled that). The
+volume persists, so no re-backfill.
 
-## Configuration
+### Config reference
 
-`config/leagues.json` is the only required config. See
-[`config/leagues.example.json`](config/leagues.example.json).
+`LEAGUES_JSON` may be raw JSON or base64-encoded JSON. All other settings have
+defaults; override via the `environment:` block only if needed:
 
 | Env var | Default | Description |
 |---|---|---|
-| `SERVER_PORT` | `3001` | Port the server listens on |
-| `CACHE_DIR` | `/app/cache` | JSON cache + `sdff.db` + `.session-secret` |
+| `LEAGUES_JSON` | — | The league config, inline (JSON or base64). Alternative: mount a file at `/app/config/leagues.json`. |
+| `SERVER_PORT` | `3001` | Port inside the container |
+| `CACHE_DIR` | `/app/cache` | DB + JSON cache + `.session-secret` (the `sdff-data` volume) |
+| `SESSION_SECRET` | auto-generated | Only set if running multiple replicas |
+| `AUTO_BACKFILL` | on | Set `0` to disable the first-run self-backfill |
+| `SYNC_ENABLED` | `1` | Set `0` to stop the background refresh scheduler |
+| `TZ` | `America/New_York` | Affects the scheduler's game-day windows |
 | `DB_PATH` | `<CACHE_DIR>/sdff.db` | SQLite file location |
-| `SESSION_SECRET` | auto-generated | Only set this if running multiple instances |
-| `LEAGUES_CONFIG_PATH` | `./config/leagues.json` | Override config location |
-| `SYNC_ENABLED` | `1` | Set `0` to disable the background sync scheduler |
-| `NODE_ENV` | `production` | — |
+| `LEAGUES_CONFIG_PATH` | `./config/leagues.json` | Config file path (when not using `LEAGUES_JSON`) |
 
 ## Architecture
 
 ```
-config/leagues.json     league identity/routing/codes (gitignored, volume-mounted)
+config/leagues.json     league config for local dev (gitignored); prod uses LEAGUES_JSON
 server/
   config/leagues.ts     Zod config loader
   db/                   schema (migrations/), migrate.ts, index.ts (connection)

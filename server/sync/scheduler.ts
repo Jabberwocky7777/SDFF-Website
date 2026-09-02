@@ -14,21 +14,20 @@ import { getSleeperClient } from '../sleeper/client.js'
 import { getLeagues } from '../config/leagues.js'
 import { ingestAll } from './ingest.js'
 import { resolveNflState } from './nflState.js'
+import { acquireSyncLock, releaseSyncLock, syncLockHolder } from './lock.js'
 
-let running = false
 let lastRun = 0
 let lastError: string | null = null
 
 export function schedulerStatus(): { running: boolean; lastRun: number; lastError: string | null } {
-  return { running, lastRun, lastError }
+  return { running: syncLockHolder() !== null, lastRun, lastError }
 }
 
 async function runIncremental(trigger: string): Promise<void> {
-  if (running) {
-    console.log(`[scheduler] skip (${trigger}) — a sync is already running`)
+  if (!acquireSyncLock(`incremental:${trigger}`)) {
+    console.log(`[scheduler] skip (${trigger}) — ${syncLockHolder()} is already running`)
     return
   }
-  running = true
   const started = Date.now()
   try {
     const db = getDb()
@@ -47,7 +46,7 @@ async function runIncremental(trigger: string): Promise<void> {
     lastError = (err as Error).message
     console.error(`[scheduler] incremental (${trigger}) failed:`, err)
   } finally {
-    running = false
+    releaseSyncLock()
   }
 }
 

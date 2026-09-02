@@ -19,11 +19,15 @@ league family. No cross-league aggregation UI yet (but `manager` is still a
 global table keyed by Sleeper `user_id`).
 
 Access is per-league and code-only — there is **no site password**. Each league
-in `config/leagues.json` has its own short `accessCode`; entering it sets a
-signed session cookie unlocking that league. The top-level `adminCode` unlocks
-every league plus the admin panel. `config/leagues.json` is required (mounted as
-a volume in prod). The session signing key comes from `SESSION_SECRET` or is
-auto-generated into `<CACHE_DIR>/.session-secret`.
+has a short `accessCode`; entering it sets a signed session cookie unlocking that
+league. The top-level `adminCode` unlocks every league plus the admin panel.
+
+Config comes from `LEAGUES_JSON` env (inline JSON or base64 — the prod/TrueNAS
+path) or `config/leagues.json` (local dev). Session signing key: `SESSION_SECRET`
+env or auto-generated to `<CACHE_DIR>/.session-secret`. On first start the server
+self-backfills history for any league with no `league_family` row
+(`AUTO_BACKFILL=0` disables). Everything is designed to be configured from the
+TrueNAS app UI — no host files, no `docker exec`.
 
 ## Architecture rules
 - Historical/computed data -> SQLite. Live/volatile data -> file cache proxy.

@@ -81,30 +81,52 @@ function stripComments(value: unknown): unknown {
   return value
 }
 
+/**
+ * Where the config comes from, in priority order:
+ *   1. LEAGUES_JSON env var — the whole config inline (raw JSON or base64).
+ *      This is the TrueNAS-friendly path: everything editable in the app UI.
+ *   2. config/leagues.json file (or LEAGUES_CONFIG_PATH) — for local dev or a
+ *      volume-mounted file.
+ */
+function readRawConfig(): { raw: string; source: string } {
+  const inline = process.env.LEAGUES_JSON?.trim()
+  if (inline) {
+    if (inline.startsWith('{')) return { raw: inline, source: 'LEAGUES_JSON env' }
+    try {
+      const decoded = Buffer.from(inline, 'base64').toString('utf8').trim()
+      if (decoded.startsWith('{')) return { raw: decoded, source: 'LEAGUES_JSON env (base64)' }
+    } catch {
+      /* fall through to the error below */
+    }
+    throw new Error('LEAGUES_JSON is set but is neither JSON nor base64-encoded JSON.')
+  }
+
+  try {
+    return { raw: fs.readFileSync(CONFIG_PATH, 'utf8'), source: CONFIG_PATH }
+  } catch {
+    throw new Error(
+      `No league config. Set the LEAGUES_JSON env var to the config JSON, or create ` +
+        `${CONFIG_PATH} (copy config/leagues.example.json). Each league needs an accessCode.`,
+    )
+  }
+}
+
 export function loadLeaguesConfig(): LeaguesConfig {
   if (cached) return cached
 
-  let raw: string
-  try {
-    raw = fs.readFileSync(CONFIG_PATH, 'utf8')
-  } catch {
-    throw new Error(
-      `League config not found at ${CONFIG_PATH}. Copy config/leagues.example.json to ` +
-        `config/leagues.json (mount it as a volume in production) and set each league's accessCode.`,
-    )
-  }
+  const { raw, source } = readRawConfig()
 
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new Error(`${CONFIG_PATH} is not valid JSON: ${(err as Error).message}`, { cause: err })
+    throw new Error(`${source} is not valid JSON: ${(err as Error).message}`, { cause: err })
   }
 
   const result = configSchema.safeParse(stripComments(parsed))
   if (!result.success) {
     throw new Error(
-      `${CONFIG_PATH} failed validation:\n${z.prettifyError(result.error)}`,
+      `${source} failed validation:\n${z.prettifyError(result.error)}`,
     )
   }
 
@@ -112,20 +134,20 @@ export function loadLeaguesConfig(): LeaguesConfig {
   const codes = new Set<string>()
   for (const league of result.data.leagues) {
     if (slugs.has(league.slug)) {
-      throw new Error(`${CONFIG_PATH}: duplicate league slug "${league.slug}"`)
+      throw new Error(`${source}: duplicate league slug "${league.slug}"`)
     }
     slugs.add(league.slug)
     if (codes.has(league.accessCode)) {
-      throw new Error(`${CONFIG_PATH}: two leagues share the access code "${league.accessCode}"`)
+      throw new Error(`${source}: two leagues share the access code "${league.accessCode}"`)
     }
     codes.add(league.accessCode)
   }
   if (result.data.adminCode && codes.has(result.data.adminCode)) {
-    throw new Error(`${CONFIG_PATH}: adminCode must not match a league accessCode`)
+    throw new Error(`${source}: adminCode must not match a league accessCode`)
   }
   if (!result.data.adminCode) {
     console.warn(
-      `[leagues] no adminCode set in ${CONFIG_PATH} — the admin panel and cross-league access are disabled`,
+      `[leagues] no adminCode set in ${source} — the admin panel and cross-league access are disabled`,
     )
   }
 
