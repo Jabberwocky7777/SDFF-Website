@@ -29,6 +29,8 @@ import {
   getStandings,
   getTimeline,
 } from '../analytics/queries.js'
+import { getAllPlay } from '../analytics/allplay.js'
+import { getPowerRankings } from '../analytics/powerRankings.js'
 
 const router = Router({ mergeParams: true })
 
@@ -73,6 +75,16 @@ router.get('/timeline', (req, res) => {
 
 router.get('/records', (req, res) => {
   res.json(getRecordsBook(getDb(), params(req).slug))
+})
+
+router.get('/allplay', (req, res) => {
+  const season = req.query.season ? Number(req.query.season) : undefined
+  res.json(getAllPlay(getDb(), params(req).slug, Number.isFinite(season) ? season : undefined))
+})
+
+router.get('/power-rankings', (req, res) => {
+  const season = req.query.season ? Number(req.query.season) : undefined
+  res.json(getPowerRankings(getDb(), params(req).slug, Number.isFinite(season) ? season : undefined))
 })
 
 router.get('/h2h', (req, res) => {
