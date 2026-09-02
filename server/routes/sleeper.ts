@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express'
 import { readCache, writeCache, readStale } from '../cache.js'
+import { getLeagues } from '../config/leagues.js'
 
 const router = Router()
 
-const LEAGUE_ID = process.env.LEAGUE_ID!
+// Legacy single-league routes target the default (first) configured league
+// unless LEAGUE_ID is explicitly set. PLAN.md §3 backward-compat.
+const LEAGUE_ID = process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 
 const GAME_DAYS = new Set([0, 1, 4]) // Sun, Mon, Thu (JS day-of-week)

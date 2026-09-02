@@ -6,9 +6,12 @@ import sleeperRouter from './routes/sleeper.js'
 import announcementsRouter from './routes/announcements.js'
 import draftRouter from './routes/draft.js'
 import adminRouter from './routes/admin.js'
+import authRouter from './routes/auth.js'
+import leaguesRouter from './routes/leagues.js'
 import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
 import { getDb } from './db/index.js'
 import { startScheduler } from './sync/scheduler.js'
+import { attachAuth, requireAuth, requireLeagueAccess } from './auth/middleware.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -45,8 +48,8 @@ if (!process.env.ADMIN_PASSWORD) {
 
 const app = express()
 const PORT = Number(process.env.SERVER_PORT ?? 3001)
-const SITE_PASSWORD = process.env.SITE_PASSWORD as string
 const IS_DEV = process.env.NODE_ENV !== 'production'
+app.set('trust proxy', true) // behind a reverse proxy — needed for req.ip rate limiting
 
 // Health check — no auth required
 app.get('/health', (_req, res) => {
@@ -65,25 +68,6 @@ app.get('/{*splat}', (_req, res, next) => {
 // JSON body parsing for API routes
 app.use(express.json())
 
-// HTTP Basic Auth — protects all /api/* routes below
-app.use((req, res, next) => {
-  const authHeader = req.headers.authorization
-
-  if (authHeader && authHeader.startsWith('Basic ')) {
-    const encoded = authHeader.slice('Basic '.length)
-    const decoded = Buffer.from(encoded, 'base64').toString('utf8')
-    const colonIdx = decoded.indexOf(':')
-    const password = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : decoded
-
-    if (password === SITE_PASSWORD) {
-      return next()
-    }
-  }
-
-  // Return JSON 401 — no WWW-Authenticate header so browser dialog never appears
-  res.status(401).json({ error: 'unauthorized' })
-})
-
 // Security headers
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -96,17 +80,32 @@ if (IS_DEV) {
   app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 }
 
-// Auth check endpoint — lightweight, just validates credentials
-app.get('/api/me', (_req, res) => {
+// Populate req.auth from the session cookie or legacy Basic Auth (never rejects).
+app.use(attachAuth)
+
+// Auth endpoints (login must be reachable without prior auth).
+app.use('/api', authRouter)
+
+// Legacy credential check — kept for the current frontend / Vite dev proxy.
+app.get('/api/me', requireAuth, (_req, res) => {
   res.json({ ok: true })
 })
 
-// Configured leagues (safe fields only — never the access codes)
-app.get('/api/leagues', (_req, res) => {
-  res.json(getLeagues().map(toPublicLeague))
+// Configured leagues the caller can see (safe fields only — never access codes).
+app.get('/api/leagues', requireAuth, (req, res) => {
+  const all = getLeagues()
+  const visible = req.auth?.admin ? all : all.filter((l) => req.auth?.slugs.includes(l.slug))
+  res.json(visible.map(toPublicLeague))
 })
 
-// Sleeper API proxy with caching
+// Namespaced per-league API. requireLeagueAccess validates :slug against config
+// (404 for unknown) and the session's allowed slugs (403).
+app.use('/api/leagues/:slug', requireLeagueAccess, leaguesRouter)
+
+// Everything below requires a valid session (or legacy Basic Auth).
+app.use('/api', requireAuth)
+
+// Sleeper API proxy with caching (legacy single-league — default league)
 app.use('/api', sleeperRouter)
 
 // Announcements
@@ -120,5 +119,7 @@ app.use('/api', adminRouter)
 
 app.listen(PORT, () => {
   console.log(`SDFF server running on http://localhost:${PORT}`)
-  if (IS_DEV) console.log('[dev] Basic Auth is enabled (password from SITE_PASSWORD env)')
+  if (IS_DEV) {
+    console.log('[dev] auth: session cookie or legacy Basic Auth (SITE_PASSWORD)')
+  }
 })

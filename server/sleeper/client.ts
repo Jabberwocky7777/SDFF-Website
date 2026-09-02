@@ -112,6 +112,14 @@ export class SleeperClient {
     return { requestCount: this.requestCount }
   }
 
+  /**
+   * Rate-limited raw GET for the live proxy layer. Accepts a full URL or a
+   * `/v1`-relative path. Returns parsed JSON (or null for 404 / empty).
+   */
+  raw(pathOrUrl: string): Promise<unknown> {
+    return this.request(pathOrUrl)
+  }
+
   private async request(pathname: string): Promise<unknown> {
     const url = pathname.startsWith('http') ? pathname : `${BASE}${pathname}`
 

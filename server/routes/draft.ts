@@ -2,10 +2,11 @@ import express, { Router, Request, Response } from 'express'
 import fs from 'fs'
 import path from 'path'
 import { readCache, writeCache, readStale } from '../cache.js'
+import { getLeagues } from '../config/leagues.js'
 
 const router = Router()
 
-const LEAGUE_ID = process.env.LEAGUE_ID!
+const LEAGUE_ID = process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 const CACHE_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
 
