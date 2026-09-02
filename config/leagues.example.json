@@ -1,0 +1,32 @@
+{
+  "$comment": "Copy to config/leagues.json and fill in real values. In production this file is mounted as a volume so leagues can be added without rebuilding the image. Run `npm run leagues:discover -- --username <you>` to list your league IDs.",
+  "sleeperUsername": "your_sleeper_username",
+  "leagues": [
+    {
+      "slug": "sdff",
+      "displayName": "Squad Dynasty Fantasy Football",
+      "currentLeagueId": "000000000000000000",
+      "type": "dynasty",
+      "sortOrder": 1,
+      "accessCode": "SDFF",
+      "theme": { "accent": "#E0B544" }
+    },
+    {
+      "slug": "redraft",
+      "displayName": "The Redraft League",
+      "currentLeagueId": "000000000000000000",
+      "type": "redraft",
+      "sortOrder": 2,
+      "accessCode": "0000",
+      "theme": { "accent": "#059669" }
+    }
+  ],
+  "adminCode": "change_me_admin",
+  "managerAliases": {
+    "$comment": "map a stale Sleeper user_id to the canonical one it should merge into",
+    "0000000000": "1111111111"
+  },
+  "displayNameOverrides": {
+    "$comment": "map a Sleeper user_id to the name to show instead of their display_name"
+  }
+}

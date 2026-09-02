@@ -13,8 +13,17 @@ dist-ssr
 dist-server
 *.local
 cache/*.json
+*.db
+*.db-shm
+*.db-wal
 .env
 .env.local
+
+# Real league config — contains access codes; mounted as a volume in prod
+config/leagues.json
+
+# Stray temp files with malformed names (from earlier tooling misfires)
+C:*Temp*
 
 # Claude Code internal
 .claude/

@@ -4,12 +4,14 @@ services:
     ports:
       - "7780:3001"    # host:container — server always listens on 3001 inside the container
     volumes:
-      - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path
+      - /mnt/pool/sdff-cache:/app/cache   # adjust to your TrueNAS dataset path (holds the JSON cache + sdff.db)
+      # Real league config, mounted read-only so leagues can be added without rebuilding:
+      - /mnt/pool/sdff/leagues.json:/app/config/leagues.json:ro
     env_file:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3

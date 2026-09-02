@@ -6,16 +6,35 @@ import sleeperRouter from './routes/sleeper.js'
 import announcementsRouter from './routes/announcements.js'
 import draftRouter from './routes/draft.js'
 import adminRouter from './routes/admin.js'
+import { getLeagues, loadLeaguesConfig, toPublicLeague } from './config/leagues.js'
+import { getDb } from './db/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const REQUIRED_ENV = ['LEAGUE_ID', 'SITE_PASSWORD'] as const
-for (const key of REQUIRED_ENV) {
-  if (!process.env[key]) {
-    console.error(`[startup] Missing required env var: ${key}`)
-    process.exit(1)
-  }
+if (!process.env.SITE_PASSWORD) {
+  console.error('[startup] Missing required env var: SITE_PASSWORD')
+  process.exit(1)
+}
+
+// League config: either config/leagues.json or a LEAGUE_ID env-var fallback.
+try {
+  const config = loadLeaguesConfig()
+  console.log(
+    `[startup] leagues: ${config.leagues.map((l) => l.slug).join(', ')}`,
+  )
+} catch (err) {
+  console.error(`[startup] ${(err as Error).message}`)
+  process.exit(1)
+}
+
+// Open the SQLite DB and run migrations. A DB failure must not take down the
+// live proxy, so this is best-effort during the multi-league migration.
+try {
+  getDb()
+  console.log('[startup] SQLite ready')
+} catch (err) {
+  console.error('[startup] SQLite init failed (historical routes will be unavailable):', err)
 }
 
 if (!process.env.ADMIN_PASSWORD) {
@@ -78,6 +97,11 @@ if (IS_DEV) {
 // Auth check endpoint — lightweight, just validates credentials
 app.get('/api/me', (_req, res) => {
   res.json({ ok: true })
+})
+
+// Configured leagues (safe fields only — never the access codes)
+app.get('/api/leagues', (_req, res) => {
+  res.json(getLeagues().map(toPublicLeague))
 })
 
 // Sleeper API proxy with caching
