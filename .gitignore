@@ -23,7 +23,9 @@ cache/*.json
 config/leagues.json
 
 # Stray temp files with malformed names (from earlier tooling misfires)
-C:*Temp*
+C*AppDataLocalTemp*
+*espn.json
+fp_qb.html
 
 # Claude Code internal
 .claude/
