@@ -20,15 +20,17 @@ you add.
 ```bash
 npm install
 
-# League config (holds the access codes — gitignored)
+# 1. League config (holds the access codes — gitignored)
 cp config/leagues.example.json config/leagues.json
-npm run leagues:discover -- --username <your_sleeper_username>   # get league IDs
-#  …edit config/leagues.json: currentLeagueId + accessCode per league, adminCode
 
-npm run db:migrate                       # create the SQLite DB
-npm run sync:backfill -- --league all    # pull history (one-time, ~1-2 min)
+# 2. Find your league IDs, then edit config/leagues.json:
+#    real currentLeagueId + a short accessCode for each league, and an adminCode
+npm run leagues:discover -- --username <your_sleeper_username>
 
-# Two terminals:
+# 3. Build the history DB (needs the real IDs from step 2)
+npm run sync:backfill -- --league all    # one-time, ~1-2 min
+
+# 4. Run it (two terminals)
 npm run dev          # Vite frontend  → http://localhost:5173
 npm run dev:server   # Express backend → http://localhost:3001
 ```
@@ -61,10 +63,11 @@ curl -O https://raw.githubusercontent.com/Jabberwocky7777/SDFF-Website/main/dock
 curl -o config/leagues.json https://raw.githubusercontent.com/Jabberwocky7777/SDFF-Website/main/config/leagues.example.json
 nano config/leagues.json    # set currentLeagueId + accessCode for each league, and adminCode
 
-# .env is optional — only for overrides (see .env.example). You can skip it.
-curl -O https://raw.githubusercontent.com/Jabberwocky7777/SDFF-Website/main/.env.example
-cp .env.example .env
+touch .env                   # compose expects the file to exist; it can stay empty
 ```
+
+Every runtime setting has a sane default, so `.env` can be empty. Populate it
+only to override something — see [`.env.example`](.env.example).
 
 Edit `docker-compose.yml` so the two volume paths match your host:
 

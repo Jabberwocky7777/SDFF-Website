@@ -7,14 +7,15 @@ services:
       # 1. Persistent app data: JSON cache, the SQLite history DB (sdff.db),
       #    and the auto-generated .session-secret. Point this at your existing
       #    sdff cache dataset — the DB just lands alongside the JSON files.
-      - /mnt/pool/sdff-cache:/app/cache
+      #    Adjust the host path to your pool/dataset.
+      - /mnt/tank/apps/sdff-cache:/app/cache
 
       # 2. League config directory. Must contain leagues.json BEFORE first start
       #    (copy config/leagues.example.json into it and set the access codes).
       #    A plain directory is fine — it does not need to be its own dataset.
-      - /mnt/pool/sdff/config:/app/config
+      - /mnt/tank/apps/sdff/config:/app/config
     env_file:
-      - .env
+      - .env               # every setting has a default; keep an (even empty) .env next to this file
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
