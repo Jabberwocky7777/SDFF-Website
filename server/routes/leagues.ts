@@ -18,6 +18,7 @@
 import express, { Router, type Request } from 'express'
 import { getDb } from '../db/index.js'
 import { getLeague } from '../config/leagues.js'
+import { requireAdmin } from '../auth/middleware.js'
 import { readCache, readStale, writeCache } from '../cache.js'
 import { getSleeperClient } from '../sleeper/client.js'
 import { fetchKtcHtmlRankings, readFlockCsv, writeFlockCsv } from '../sleeper/external.js'
@@ -373,8 +374,11 @@ router.get('/live/flock-rankings', (_req, res) => {
   }
 })
 
+// Admin-only: writeFlockCsv targets one hub-wide file, so this is a
+// cross-league write and a member of any single league should not hold it.
 router.post(
   '/live/flock-rankings',
+  requireAdmin,
   express.text({ type: 'text/plain', limit: '1mb' }),
   (req, res) => {
     const body = req.body as string

@@ -1,3 +1,13 @@
+/**
+ * Commissioner-maintained overrides for facts Sleeper doesn't carry: who has
+ * paid dues, championship results predating the league's Sleeper history, and
+ * the squad-pot balance.
+ *
+ * The split is deliberate. Writes are mounted under /admin and gated with
+ * requireAdmin; the reads are unprefixed and need only a session, because the
+ * dues table and championship banners are league-member-facing pages. The
+ * blanket requireAuth in index.ts is what keeps them off the public internet.
+ */
 import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
