@@ -2,9 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import sleeperRouter from './routes/sleeper.js'
 import announcementsRouter from './routes/announcements.js'
-import draftRouter from './routes/draft.js'
+import legacyGoneRouter from './routes/legacy-gone.js'
 import adminRouter from './routes/admin.js'
 import adminLeaguesRouter from './routes/admin-leagues.js'
 import authRouter from './routes/auth.js'
@@ -21,13 +20,7 @@ import { securityHeaders } from './security.js'
 import { startScheduler } from './sync/scheduler.js'
 import { startBackupJob } from './sync/backup.js'
 import { autoBackfillIfNeeded } from './sync/autobackfill.js'
-import {
-  attachAuth,
-  requireAdmin,
-  requireAuth,
-  requireDefaultLeagueAccess,
-  requireLeagueAccess,
-} from './auth/middleware.js'
+import { attachAuth, requireAdmin, requireAuth, requireLeagueAccess } from './auth/middleware.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -125,8 +118,7 @@ if (dbError) {
   app.use('/api/leagues/:slug', requireLeagueAccess, leaguesRouter)
   app.use('/api', requireAuth)
   app.use('/api', announcementsRouter)
-  app.use('/api', requireDefaultLeagueAccess, sleeperRouter)
-  app.use('/api', requireDefaultLeagueAccess, draftRouter)
+  app.use('/api', legacyGoneRouter)
   app.use('/api', adminRouter)
 
   const server = app.listen(PORT, () => {
