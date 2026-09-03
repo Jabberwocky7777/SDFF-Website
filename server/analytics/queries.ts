@@ -251,7 +251,7 @@ export function getStandings(db: DB, slug: string, season?: number): StandingRow
   )
 }
 
-export interface H2HCell {
+export interface H2HRecord {
   wins: number
   losses: number
   ties: number
@@ -260,39 +260,61 @@ export interface H2HCell {
   meetings: number
 }
 
+/** A vs B, split by phase. `combined` = regular + playoff (consolation excluded). */
+export interface H2HCell {
+  combined: H2HRecord
+  regular: H2HRecord
+  playoff: H2HRecord
+}
+
 export interface H2HMatrix {
   managers: Array<{ userId: string; name: string }>
   /** cells[a][b] = a's record vs b */
   cells: Record<string, Record<string, H2HCell>>
 }
 
+function emptyRecord(): H2HRecord {
+  return { wins: 0, losses: 0, ties: 0, pointsFor: 0, pointsAgainst: 0, meetings: 0 }
+}
+
+function tallyRecord(rec: H2HRecord, g: { result: 'W' | 'L' | 'T'; points: number; opponent_points: number | null }): void {
+  if (g.result === 'W') rec.wins++
+  else if (g.result === 'L') rec.losses++
+  else rec.ties++
+  rec.pointsFor += g.points
+  rec.pointsAgainst += g.opponent_points ?? 0
+  rec.meetings++
+}
+
+function roundRecord(rec: H2HRecord): void {
+  rec.pointsFor = round2(rec.pointsFor)
+  rec.pointsAgainst = round2(rec.pointsAgainst)
+}
+
 export function getH2HMatrix(db: DB, slug: string): H2HMatrix {
-  const games = familyGames(db, slug)
+  const games = familyGames(db, slug).filter((g) => !g.is_consolation)
   const names = displayNames(db, games.flatMap((g) => [g.user_id, g.opponent_user_id ?? '']))
   names.delete('')
 
   const cells: Record<string, Record<string, H2HCell>> = {}
   const ensure = (a: string, b: string): H2HCell => {
     cells[a] ??= {}
-    cells[a][b] ??= { wins: 0, losses: 0, ties: 0, pointsFor: 0, pointsAgainst: 0, meetings: 0 }
+    cells[a][b] ??= { combined: emptyRecord(), regular: emptyRecord(), playoff: emptyRecord() }
     return cells[a][b]
   }
 
   for (const g of games) {
     if (!g.opponent_user_id) continue
     const cell = ensure(g.user_id, g.opponent_user_id)
-    if (g.result === 'W') cell.wins++
-    else if (g.result === 'L') cell.losses++
-    else cell.ties++
-    cell.pointsFor += g.points
-    cell.pointsAgainst += g.opponent_points ?? 0
-    cell.meetings++
+    tallyRecord(cell.combined, g)
+    tallyRecord(g.is_playoff ? cell.playoff : cell.regular, g)
   }
 
   for (const a of Object.keys(cells)) {
     for (const b of Object.keys(cells[a])) {
-      cells[a][b].pointsFor = round2(cells[a][b].pointsFor)
-      cells[a][b].pointsAgainst = round2(cells[a][b].pointsAgainst)
+      roundRecord(cells[a][b].combined)
+      roundRecord(cells[a][b].regular)
+      roundRecord(cells[a][b].playoff)
     }
   }
 
@@ -314,23 +336,36 @@ export interface H2HGame {
   isConsolation: boolean
 }
 
-export function getH2HGameLog(db: DB, slug: string, userA: string, userB: string): {
+export interface H2HWLT {
+  wins: number
+  losses: number
+  ties: number
+}
+
+export interface H2HGameLog {
   a: string
   b: string
   aName: string
   bName: string
-  record: { wins: number; losses: number; ties: number }
+  /** combined = regular + playoff (consolation games are excluded everywhere). */
+  record: { combined: H2HWLT; regular: H2HWLT; playoff: H2HWLT }
   games: H2HGame[]
-} {
+}
+
+export function getH2HGameLog(db: DB, slug: string, userA: string, userB: string): H2HGameLog {
   const family = getFamily(db, slug)
   const names = displayNames(db, [userA, userB])
-  const empty = {
+  const empty: H2HGameLog = {
     a: userA,
     b: userB,
     aName: names.get(userA) ?? userA,
     bName: names.get(userB) ?? userB,
-    record: { wins: 0, losses: 0, ties: 0 },
-    games: [] as H2HGame[],
+    record: {
+      combined: { wins: 0, losses: 0, ties: 0 },
+      regular: { wins: 0, losses: 0, ties: 0 },
+      playoff: { wins: 0, losses: 0, ties: 0 },
+    },
+    games: [],
   }
   if (!family) return empty
 
@@ -339,6 +374,7 @@ export function getH2HGameLog(db: DB, slug: string, userA: string, userB: string
       `SELECT ls.season, m.week, m.points, m.opponent_points, m.result, m.is_playoff, m.is_consolation
        FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
        WHERE ls.family_id = ? AND m.user_id = ? AND m.opponent_user_id = ? AND m.result IS NOT NULL
+         AND m.is_consolation = 0
        ORDER BY ls.season, m.week`,
     )
     .all(family.id, userA, userB) as Array<{
@@ -351,11 +387,15 @@ export function getH2HGameLog(db: DB, slug: string, userA: string, userB: string
     is_consolation: number
   }>
 
-  const record = { wins: 0, losses: 0, ties: 0 }
+  const record = empty.record
+  const bump = (r: H2HWLT, result: 'W' | 'L' | 'T') => {
+    if (result === 'W') r.wins++
+    else if (result === 'L') r.losses++
+    else r.ties++
+  }
   const games: H2HGame[] = rows.map((r) => {
-    if (r.result === 'W') record.wins++
-    else if (r.result === 'L') record.losses++
-    else record.ties++
+    bump(record.combined, r.result)
+    bump(r.is_playoff ? record.playoff : record.regular, r.result)
     return {
       season: r.season,
       week: r.week,

@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
-import { getTrade, type TradeAssetView, type TradeSideView } from '@/api/hub'
+import { getTrade, type SeasonLine, type TradeAssetView, type TradeSideView } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState, fmtSigned } from './shared'
 
@@ -37,7 +37,36 @@ function AssetRow({ a }: { a: TradeAssetView }) {
   )
 }
 
-function Side({ side, leading }: { side: TradeSideView; leading: boolean }) {
+function SeasonTable({ lines }: { lines: SeasonLine[] }) {
+  if (lines.length === 0) return null
+  return (
+    <div className="mb-3">
+      {lines.map((l) => (
+        <div
+          key={l.season}
+          className="flex items-center justify-between py-1.5 border-b border-borderLow/60 last:border-0"
+        >
+          <span className="text-small font-semibold text-muted">{l.season} points</span>
+          <span className="font-mono text-small tabular text-text">
+            {l.pointsStarted.toFixed(1)} started
+            <span className="text-mutedLow"> · {l.weeksStarted} st</span>
+            <span className="text-mutedLow"> · PAR {fmtSigned(l.par)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Side({
+  side,
+  leading,
+  multiSeason,
+}: {
+  side: TradeSideView
+  leading: boolean
+  multiSeason: boolean
+}) {
   return (
     <div className={`bg-surface border rounded-lg p-4 ${leading ? 'border-gold/40' : 'border-borderLow'}`}>
       <div className="flex items-baseline justify-between mb-3">
@@ -46,12 +75,20 @@ function Side({ side, leading }: { side: TradeSideView; leading: boolean }) {
           <div className="font-mono text-numLg font-bold text-gold tabular">
             {side.totals.pointsStarted.toFixed(1)}
           </div>
-          <div className="text-label text-muted uppercase">started pts</div>
+          <div className="text-label text-muted uppercase">
+            {multiSeason ? 'total started pts' : 'started pts'}
+          </div>
         </div>
       </div>
-      <div className="text-small text-muted mb-2">
-        Received {side.totals.assetsReceived} · {side.totals.assetsStillRostered} still rostered ·
-        PAR {fmtSigned(side.totals.par)}
+      <div className="text-small text-muted mb-3">
+        Received {side.totals.assetsReceived} · {side.totals.assetsStillRostered} still rostered · PAR{' '}
+        {fmtSigned(side.totals.par)}
+      </div>
+
+      {multiSeason && side.bySeason.length > 0 && <SeasonTable lines={side.bySeason} />}
+
+      <div className="text-label text-muted uppercase tracking-[0.05em] font-semibold mt-2 mb-1">
+        {multiSeason ? 'What they got (all seasons)' : 'What they got'}
       </div>
       <div>
         {side.received.length === 0 ? (
@@ -73,7 +110,10 @@ export default function HubTradeDetail() {
   })
 
   const back = (
-    <Link to={`/l/${slug}/trades`} className="text-gold/70 text-small hover:text-gold transition-colors inline-flex items-center gap-1 mb-5">
+    <Link
+      to={`/l/${slug}/trades`}
+      className="text-gold/70 text-small hover:text-gold transition-colors inline-flex items-center gap-1 mb-5"
+    >
       ← All trades
     </Link>
   )
@@ -89,7 +129,11 @@ export default function HubTradeDetail() {
       : -1
 
   const when = trade.date
-    ? new Date(trade.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+    ? new Date(trade.date).toLocaleDateString(undefined, {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
     : `${trade.season}${trade.week != null ? `, week ${trade.week}` : ''}`
 
   return (
@@ -103,16 +147,17 @@ export default function HubTradeDetail() {
         <h1 className="font-sans text-h1 font-bold text-text">{trade.headline}</h1>
         {trade.weeksElapsed > 0 && (
           <p className="text-small text-mutedLow mt-1">
-            Measured over {trade.weeksElapsed} roster week{trade.weeksElapsed === 1 ? '' : 's'} since
-            the deal. &ldquo;Started pts&rdquo; counts only weeks an asset was in the lineup; PAR is
-            versus a replacement-level starter.
+            {trade.multiSeason
+              ? 'Dynasty — each side’s return is tracked every season it stayed on the roster.'
+              : 'Redraft — scored only over the season the trade happened.'}{' '}
+            &ldquo;Started pts&rdquo; counts weeks in the lineup; PAR is versus a replacement-level starter.
           </p>
         )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {trade.sides.map((s, i) => (
-          <Side key={s.userId} side={s} leading={i === leaderIdx} />
+          <Side key={s.userId} side={s} leading={i === leaderIdx} multiSeason={trade.multiSeason} />
         ))}
       </div>
     </div>

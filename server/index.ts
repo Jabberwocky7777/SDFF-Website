@@ -10,6 +10,7 @@ import adminLeaguesRouter from './routes/admin-leagues.js'
 import authRouter from './routes/auth.js'
 import setupRouter from './routes/setup.js'
 import leaguesRouter from './routes/leagues.js'
+import draftToolRouter from './routes/draft-tool.js'
 import { getLeagues, toPublicLeague } from './config/leagues.js'
 import { bootstrapLeaguesIfEmpty } from './config/bootstrap.js'
 import { maybeResetAdmin } from './auth/admin.js'
@@ -113,6 +114,7 @@ if (dbError) {
   app.get('/api/me', requireAuth, (_req, res) => res.json({ ok: true }))
   app.use('/api/admin', requireAuth, requireAdmin)
   app.use('/api', adminLeaguesRouter)
+  app.use('/api/draft-tool', requireAuth, requireAdmin, draftToolRouter)
   app.get('/api/leagues', requireAuth, (req, res) => {
     const all = getLeagues()
     const visible = req.auth?.admin ? all : all.filter((l) => req.auth?.slugs.includes(l.slug))

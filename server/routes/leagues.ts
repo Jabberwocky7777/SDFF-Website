@@ -35,6 +35,7 @@ import {
 import { getAllPlay } from '../analytics/allplay.js'
 import { getPowerRankings } from '../analytics/powerRankings.js'
 import { getTradeDetail, getTradeFeed } from '../analytics/trades.js'
+import { getDraftBoard, getDraftSeasons } from '../analytics/drafts.js'
 
 const router = Router({ mergeParams: true })
 
@@ -139,6 +140,26 @@ router.get('/trades/:tradeId', (req, res) => {
   res.json(trade)
 })
 
+// ── Historical draft boards ─────────────────────────────────────────────────
+
+router.get('/drafts', (req, res) => {
+  res.json(getDraftSeasons(getDb(), params(req).slug))
+})
+
+router.get('/drafts/:season', (req, res) => {
+  const season = Number(params(req).season)
+  if (!Number.isInteger(season)) {
+    res.status(400).json({ error: 'bad season' })
+    return
+  }
+  const board = getDraftBoard(getDb(), params(req).slug, season)
+  if (!board) {
+    res.status(404).json({ error: 'no draft on record for that season' })
+    return
+  }
+  res.json(board)
+})
+
 router.get('/managers/:userId', (req, res) => {
   const db = getDb()
   const slug = params(req).slug, userId = params(req).userId
@@ -153,7 +174,7 @@ router.get('/managers/:userId', (req, res) => {
     .map(([oppId, cell]) => ({
       userId: oppId,
       name: matrix.managers.find((m) => m.userId === oppId)?.name ?? oppId,
-      ...cell,
+      ...cell.combined,
     }))
     .filter((o) => o.meetings >= 3)
   const nemesis = [...opponents].sort(

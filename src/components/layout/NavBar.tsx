@@ -15,6 +15,7 @@ export default function NavBar() {
 
   const links = [
     ...(showLeagues ? [{ to: '/l', label: 'Leagues' }] : []),
+    ...(admin ? [{ to: '/draft-board', label: 'Draft Board' }] : []),
     ...(admin ? [{ to: '/settings', label: 'Settings' }] : []),
   ]
 

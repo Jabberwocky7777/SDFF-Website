@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDraftData, type EnrichedPlayer, type DynastyProfile } from '@/hooks/useDraftData'
 import { parseFlockCsv } from '@/lib/parseFlockCsv'
 import { apiFetch } from '@/api/client'
-import { useLeagueSlug } from '@/context/LeagueScope'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import type { Position } from '@/lib/parseFlockCsv'
 
@@ -103,7 +102,6 @@ function StatusPill({ status }: { status: string | null }) {
 type UploadState = 'idle' | 'ready' | 'uploading' | 'success' | 'error'
 
 function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUploaded: () => void }) {
-  const slug = useLeagueSlug()
   const [dragOver, setDragOver]       = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [uploadMsg, setUploadMsg]     = useState('')
@@ -155,14 +153,11 @@ function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUpl
     if (!preview) return
     setUploadState('uploading')
     try {
-      const result = await apiFetch<{ success: boolean; count: number }>(
-        `/leagues/${slug}/live/flock-rankings`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: preview.csv,
-        },
-      )
+      const result = await apiFetch<{ success: boolean; count: number }>('/draft-tool/flock-rankings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: preview.csv,
+      })
       localStorage.setItem(LS_FLOCK_TS, String(Date.now()))
       setUploadState('success')
       setUploadMsg(`✓ Updated — ${result.count} players loaded`)
@@ -403,7 +398,7 @@ export default function DraftBoard() {
   if (isLoading && players.length === 0) {
     return (
       <div>
-        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-6">SDFF Draft Board</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text mb-6">Draft Board</h1>
         <SkeletonLoader rows={12} />
       </div>
     )
@@ -416,7 +411,7 @@ export default function DraftBoard() {
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text">SDFF Draft Board</h1>
+        <h1 className="font-sans text-h1 sm:text-hero font-bold text-text">Draft Board</h1>
         <StatusPill status={draftStatus} />
         {draftStatus === 'drafting' && (
           <span className="text-small text-muted font-mono">Pick {currentPickNo} / {totalPicks}</span>

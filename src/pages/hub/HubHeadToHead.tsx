@@ -2,13 +2,21 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
-import { getH2HMatrix, type H2HCell } from '@/api/hub'
+import { getH2HMatrix, type H2HCell, type H2HRecord } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
 
-function cellTone(cell: H2HCell | undefined): string {
-  if (!cell || cell.meetings === 0) return 'text-mutedLow'
-  const diff = cell.wins - cell.losses
+type Phase = 'combined' | 'regular' | 'playoff'
+
+const PHASE_LABEL: Record<Phase, string> = {
+  combined: 'Combined',
+  regular: 'Regular season',
+  playoff: 'Playoffs',
+}
+
+function tone(rec: H2HRecord | undefined): string {
+  if (!rec || rec.meetings === 0) return 'text-mutedLow'
+  const diff = rec.wins - rec.losses
   if (diff >= 3) return 'text-green-400 font-semibold'
   if (diff > 0) return 'text-green-400/80'
   if (diff <= -3) return 'text-red-400 font-semibold'
@@ -20,6 +28,7 @@ export default function HubHeadToHead() {
   const { slug } = useHub()
   const navigate = useNavigate()
   const [hover, setHover] = useState<{ a: string; b: string } | null>(null)
+  const [phase, setPhase] = useState<Phase>('combined')
 
   const { data, isLoading } = useQuery({
     queryKey: ['hub', slug, 'h2h'],
@@ -29,24 +38,49 @@ export default function HubHeadToHead() {
   const initials = useMemo(() => {
     const m = new Map<string, string>()
     data?.managers.forEach((mgr) => {
-      m.set(
-        mgr.userId,
-        mgr.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase(),
-      )
+      m.set(mgr.userId, mgr.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase())
     })
     return m
   }, [data])
+
+  const hasPlayoffs = useMemo(
+    () =>
+      !!data &&
+      Object.values(data.cells).some((row) =>
+        Object.values(row).some((c) => c.playoff.meetings > 0),
+      ),
+    [data],
+  )
 
   if (isLoading) return <SkeletonLoader rows={10} />
   if (!data || data.managers.length < 2) {
     return <EmptyState>Head-to-head records appear once managers have faced each other.</EmptyState>
   }
 
+  const pick = (cell: H2HCell | undefined): H2HRecord | undefined => cell?.[phase]
+
   return (
     <div>
-      <p className="text-body text-muted mb-6 max-w-2xl">
-        Career record for every manager pairing. Row beats column. Click any cell for the full game log.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <p className="text-body text-muted max-w-xl">
+          Every manager pairing — row beats column. Click a cell for the full game log.
+        </p>
+        <div className="flex gap-1 bg-surfaceHi border border-borderLow rounded-lg p-1">
+          {(['combined', 'regular', 'playoff'] as const)
+            .filter((p) => p !== 'playoff' || hasPlayoffs)
+            .map((p) => (
+              <button
+                key={p}
+                onClick={() => setPhase(p)}
+                className={`px-3 py-1.5 text-small font-semibold rounded-md transition-all ${
+                  phase === p ? 'bg-gold text-[#1A1100]' : 'text-muted hover:text-text'
+                }`}
+              >
+                {PHASE_LABEL[p]}
+              </button>
+            ))}
+        </div>
+      </div>
 
       <div className="bg-surface border border-borderLow rounded-lg overflow-x-auto">
         <table className="border-collapse">
@@ -80,16 +114,20 @@ export default function HubHeadToHead() {
                   if (rowM.userId === colM.userId) {
                     return <td key={colM.userId} className="bg-white/3 border border-borderLow/40" />
                   }
-                  const cell = data.cells[rowM.userId]?.[colM.userId]
+                  const rec = pick(data.cells[rowM.userId]?.[colM.userId])
                   return (
                     <td
                       key={colM.userId}
                       onMouseEnter={() => setHover({ a: rowM.userId, b: colM.userId })}
                       onMouseLeave={() => setHover(null)}
-                      onClick={() => cell && navigate(`/l/${slug}/head-to-head/${rowM.userId}/vs/${colM.userId}`)}
-                      className={`border border-borderLow/40 text-center px-2.5 py-2 font-mono text-num tabular cursor-pointer transition-colors hover:bg-white/5 ${cellTone(cell)}`}
+                      onClick={() =>
+                        rec && navigate(`/l/${slug}/head-to-head/${rowM.userId}/vs/${colM.userId}`)
+                      }
+                      className={`border border-borderLow/40 text-center px-2.5 py-2 font-mono text-num tabular cursor-pointer transition-colors hover:bg-white/5 ${tone(rec)}`}
                     >
-                      {cell && cell.meetings > 0 ? `${cell.wins}-${cell.losses}${cell.ties ? `-${cell.ties}` : ''}` : '·'}
+                      {rec && rec.meetings > 0
+                        ? `${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ''}`
+                        : '·'}
                     </td>
                   )
                 })}

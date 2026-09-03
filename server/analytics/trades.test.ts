@@ -13,39 +13,10 @@ const migrationsDir = path.join(
   'migrations',
 )
 
-function freshDb(): DB {
-  const db = new Database(':memory:')
+function runMigrations(db: DB): void {
   for (const f of fs.readdirSync(migrationsDir).filter((x) => x.endsWith('.sql')).sort()) {
     db.exec(fs.readFileSync(path.join(migrationsDir, f), 'utf8'))
   }
-  db.prepare(
-    `INSERT INTO league_family (id, slug, display_name, league_type, current_league_id)
-     VALUES (1,'t','T','redraft','L2024')`,
-  ).run()
-  db.prepare(
-    `INSERT INTO league_season (league_id, family_id, season, status, previous_league_id)
-     VALUES ('L2023',1,2023,'complete',NULL), ('L2024',1,2024,'complete','L2023')`,
-  ).run()
-  for (const [id, nm] of [['A', 'Alice'], ['B', 'Bob']]) {
-    db.prepare(`INSERT INTO manager (user_id, display_name) VALUES (?,?)`).run(id, nm)
-  }
-  // roster 1 = Alice, roster 2 = Bob, both seasons
-  for (const lg of ['L2023', 'L2024']) {
-    db.prepare(
-      `INSERT INTO team_season (league_id, roster_id, user_id, team_name) VALUES (?,1,'A','Team A'),(?,2,'B','Team B')`,
-    ).run(lg, lg)
-  }
-  for (const [pid, nm, pos] of [
-    ['p1', 'Star WR', 'WR'],
-    ['p2', 'Bust RB', 'RB'],
-    ['r1', 'Repl WR', 'WR'],
-    ['r2', 'Repl WR 2', 'WR'],
-  ]) {
-    db.prepare(
-      `INSERT INTO player (player_id, full_name, position) VALUES (?,?,?)`,
-    ).run(pid, nm, pos)
-  }
-  return db
 }
 
 function pwr(
@@ -65,17 +36,37 @@ function pwr(
   ).run(leagueId, season, week, playerId, rosterId, userId, points, started)
 }
 
-let db: DB
-beforeEach(() => {
-  db = freshDb()
-
-  // Baseline so the WR replacement percentile is well-defined (~5 pts).
-  for (let w = 1; w <= 8; w++) {
-    pwr(db, 'L2024', 2024, w, 'r1', 2, 'B', 5, 1)
-    pwr(db, 'L2024', 2024, w, 'r2', 1, 'A', 5, 1)
+/** Two seasons (2024, 2025), rosters 1=Alice 2=Bob, players p1/p2 + WR baseline. */
+function seedFamily(db: DB, leagueType: 'redraft' | 'dynasty'): DB {
+  db.prepare(
+    `INSERT INTO league_family (id, slug, display_name, league_type, current_league_id)
+     VALUES (1,'t','T',?,'L2025')`,
+  ).run(leagueType)
+  db.prepare(
+    `INSERT INTO league_season (league_id, family_id, season, status, previous_league_id)
+     VALUES ('L2024',1,2024,'complete',NULL), ('L2025',1,2025,'complete','L2024')`,
+  ).run()
+  for (const [id, nm] of [['A', 'Alice'], ['B', 'Bob']]) {
+    db.prepare(`INSERT INTO manager (user_id, display_name) VALUES (?,?)`).run(id, nm)
+  }
+  for (const lg of ['L2024', 'L2025']) {
+    db.prepare(
+      `INSERT INTO team_season (league_id, roster_id, user_id, team_name) VALUES (?,1,'A','A'),(?,2,'B','B')`,
+    ).run(lg, lg)
+  }
+  for (const [pid, nm, pos] of [
+    ['p1', 'Star WR', 'WR'],
+    ['p2', 'Bust RB', 'RB'],
+    ['r1', 'Repl WR', 'WR'],
+  ]) {
+    db.prepare(`INSERT INTO player (player_id, full_name, position) VALUES (?,?,?)`).run(pid, nm, pos)
+  }
+  // WR replacement baseline ≈ 5.
+  for (const [lg, sn] of [['L2024', 2024], ['L2025', 2025]] as const) {
+    for (let w = 1; w <= 8; w++) pwr(db, lg, sn, w, 'r1', 2, 'B', 5, 1)
   }
 
-  // Trade in 2024 week 5: Alice sends p2 (RB) to Bob, gets p1 (WR) from Bob.
+  // Trade in 2024 week 5: Alice gets p1 from Bob, Bob gets p2 from Alice.
   db.prepare(
     `INSERT INTO trade (id, league_id, family_id, season, week, created_ms, team_count, roster_ids_json, is_offseason)
      VALUES ('T1','L2024',1,2024,5,1000,2,'[1,2]',0)`,
@@ -85,71 +76,81 @@ beforeEach(() => {
      VALUES ('T1','player','p1',2,1,'B','A'), ('T1','player','p2',1,2,'A','B')`,
   ).run()
 
-  // Weeks 1-4 (pre-trade): p1 on Bob, p2 on Alice — must NOT count.
+  // Pre-trade weeks 1-4 (must NOT count).
   for (let w = 1; w <= 4; w++) {
     pwr(db, 'L2024', 2024, w, 'p1', 2, 'B', 30, 1)
-    pwr(db, 'L2024', 2024, w, 'p2', 1, 'A', 3, 1)
   }
-  // Weeks 5-8 (post-trade): p1 on Alice (starts, 20/wk), p2 on Bob (benched wk5, starts wk6-8 at 2/wk).
-  for (let w = 5; w <= 8; w++) {
-    pwr(db, 'L2024', 2024, w, 'p1', 1, 'A', 20, 1)
-    pwr(db, 'L2024', 2024, w, 'p2', 2, 'B', 2, w === 5 ? 0 : 1)
-  }
+  // 2024 weeks 5-8: p1 on Alice, starts, 20/wk.
+  for (let w = 5; w <= 8; w++) pwr(db, 'L2024', 2024, w, 'p1', 1, 'A', 20, 1)
+  // 2025 weeks 1-8: p1 STILL on Alice (dynasty keeps him), starts, 25/wk.
+  for (let w = 1; w <= 8; w++) pwr(db, 'L2025', 2025, w, 'p1', 1, 'A', 25, 1)
+  return db
+}
+
+function fresh(leagueType: 'redraft' | 'dynasty'): DB {
+  const db = new Database(':memory:')
+  runMigrations(db)
+  return seedFamily(db, leagueType)
+}
+
+describe('getTradeDetail — redraft caps at the trade season', () => {
+  let db: DB
+  beforeEach(() => {
+    db = fresh('redraft')
+  })
+
+  it('counts only the trade season, ignoring later years', () => {
+    const t = getTradeDetail(db, 't', 'T1')!
+    expect(t.multiSeason).toBe(false)
+    const alice = t.sides.find((s) => s.userId === 'A')!
+    // 2024 wk5-8 only = 4 × 20 = 80. NOT the 2025 points.
+    expect(alice.totals.pointsStarted).toBe(80)
+    expect(alice.bySeason).toHaveLength(1)
+    expect(alice.bySeason[0].season).toBe(2024)
+    expect(alice.bySeason[0].pointsStarted).toBe(80)
+  })
+
+  it('PAR subtracts a replacement baseline', () => {
+    const alice = getTradeDetail(db, 't', 'T1')!.sides.find((s) => s.userId === 'A')!
+    // 80 − 4 × ~5 ≈ 60.
+    expect(alice.bySeason[0].par).toBeCloseTo(60, 0)
+  })
 })
 
-describe('getTradeFeed / getTradeDetail', () => {
-  it('attributes only post-trade weeks to the receiver', () => {
-    const t = getTradeDetail(db, 't', 'T1')!
-    const alice = t.sides.find((s) => s.userId === 'A')!
-    const bob = t.sides.find((s) => s.userId === 'B')!
-
-    // Alice got p1: weeks 5-8 only = 4 × 20 = 80, all started.
-    expect(alice.received).toHaveLength(1)
-    expect(alice.received[0].pointsRostered).toBe(80)
-    expect(alice.received[0].pointsStarted).toBe(80)
-    expect(alice.received[0].weeksRostered).toBe(4)
-    expect(alice.received[0].weeksStarted).toBe(4)
-
-    // Bob got p2: weeks 5-8 rostered = 4 × 2 = 8; started weeks 6-8 = 6.
-    expect(bob.received[0].pointsRostered).toBe(8)
-    expect(bob.received[0].pointsStarted).toBe(6)
-    expect(bob.received[0].weeksStarted).toBe(3)
+describe('getTradeDetail — dynasty follows the asset across seasons', () => {
+  let db: DB
+  beforeEach(() => {
+    db = fresh('dynasty')
   })
 
-  it('PAR subtracts a replacement baseline from started points', () => {
+  it('breaks the return out per season', () => {
     const t = getTradeDetail(db, 't', 'T1')!
+    expect(t.multiSeason).toBe(true)
     const alice = t.sides.find((s) => s.userId === 'A')!
-    // Replacement WR ≈ 5 pts/wk; Alice started p1 4 weeks at 20 → PAR ≈ 80 − 4×5 = 60.
-    expect(alice.received[0].par).toBeCloseTo(60, 0)
+    expect(alice.bySeason.map((l) => l.season)).toEqual([2024, 2025])
+    expect(alice.bySeason[0].pointsStarted).toBe(80) // 2024: 4 × 20
+    expect(alice.bySeason[1].pointsStarted).toBe(200) // 2025: 8 × 25
+    expect(alice.totals.pointsStarted).toBe(280) // grand total
   })
 
-  it('produces a directional headline and net differential', () => {
+  it('headline compares grand started points', () => {
     const t = getTradeDetail(db, 't', 'T1')!
-    // Alice +80 started, Bob +6 started → Alice ahead by 74.
-    expect(t.netStartedDiff).toBeCloseTo(74)
+    expect(t.netStartedDiff).toBeCloseTo(280) // Alice 280, Bob 0 (p2 never rostered post-trade)
     expect(t.headline.toLowerCase()).toContain('alice')
   })
+})
 
-  it('marks assets still on the roster in the latest snapshot', () => {
-    const t = getTradeDetail(db, 't', 'T1')!
-    const alice = t.sides.find((s) => s.userId === 'A')!
-    const bob = t.sides.find((s) => s.userId === 'B')!
-    // Latest snapshot is 2024 wk8: p1 on Alice, p2 on Bob → both still rostered.
-    expect(alice.received[0].stillRostered).toBe(true)
-    expect(bob.received[0].stillRostered).toBe(true)
-    expect(alice.totals.assetsStillRostered).toBe(1)
-  })
-
-  it('feed lists the family trades, newest first', () => {
-    const feed = getTradeFeed(db, 't')
-    expect(feed).toHaveLength(1)
-    expect(feed[0].id).toBe('T1')
+describe('getTradeFeed', () => {
+  it('lists family trades and filters', () => {
+    const db = fresh('redraft')
+    expect(getTradeFeed(db, 't')).toHaveLength(1)
     expect(getTradeFeed(db, 't', { season: 2023 })).toHaveLength(0)
     expect(getTradeFeed(db, 't', { userId: 'A' })).toHaveLength(1)
     expect(getTradeFeed(db, 't', { userId: 'nobody' })).toHaveLength(0)
   })
 
-  it('returns [] for an unknown league and null for an unknown trade', () => {
+  it('returns [] / null for unknowns', () => {
+    const db = fresh('redraft')
     expect(getTradeFeed(db, 'nope')).toEqual([])
     expect(getTradeDetail(db, 't', 'nope')).toBeNull()
   })

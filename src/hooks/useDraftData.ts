@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { usePlayers } from '@/hooks/usePlayers'
 import { parseFlockCsv, normalizePlayerName } from '@/lib/parseFlockCsv'
 import { apiFetch, ApiError } from '@/api/client'
 import { API_BASE } from '@/config'
-import { useLeagueSlug } from '@/context/LeagueScope'
 import type { Position } from '@/lib/parseFlockCsv'
 import type { SleeperDraftPick } from '@/hooks/useDraftPicks'
+import type { SleeperPlayersMap } from '@/types/sleeper'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -103,36 +102,40 @@ export function useDraftData({
   pollIntervalMs = 30_000,
 }: UseDraftDataOptions) {
   const queryClient = useQueryClient()
-  const slug = useLeagueSlug()
 
-  // Sleeper player map (24h, shared with rest of app)
-  const { data: playersMap } = usePlayers()
+  // Sleeper player map (24h) — via the admin draft tool, not league-scoped.
+  const { data: playersMap } = useQuery({
+    queryKey: ['draft-tool', 'players'],
+    queryFn: () => apiFetch<SleeperPlayersMap>('/draft-tool/players'),
+    staleTime: 24 * 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+  })
 
   // Flock rankings CSV (60s stale)
   const flockQuery = useQuery({
     queryKey: ['flock-rankings'],
-    queryFn: () => apiTextFetch(`/leagues/${slug}/live/flock-rankings`),
+    queryFn: () => apiTextFetch('/draft-tool/flock-rankings'),
     staleTime: 60_000,
   })
 
   // KTC dynasty rankings (1h stale)
   const ktcQuery = useQuery({
     queryKey: ['ktc-rankings'],
-    queryFn: () => apiFetch<KtcPlayer[]>(`/leagues/${slug}/live/ktc-rankings`),
+    queryFn: () => apiFetch<KtcPlayer[]>('/draft-tool/ktc-rankings'),
     staleTime: 60 * 60_000,
   })
 
   // FantasyCalc dynasty rankings (1h stale)
   const fcQuery = useQuery({
     queryKey: ['fantasycalc-rankings'],
-    queryFn: () => apiFetch<FcEntry[]>(`/leagues/${slug}/live/fantasycalc-rankings`),
+    queryFn: () => apiFetch<FcEntry[]>('/draft-tool/fantasycalc-rankings'),
     staleTime: 60 * 60_000,
   })
 
   // Live draft metadata (status, settings.teams/rounds)
   const liveMetaQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'meta'],
-    queryFn: () => apiFetch<SleeperDraftMeta>(`/leagues/${slug}/live/draft/${liveDraftId}`),
+    queryFn: () => apiFetch<SleeperDraftMeta>(`/draft-tool/draft/${liveDraftId}`),
     staleTime: 30_000,
     refetchInterval: pollIntervalMs,
     enabled: !!liveDraftId,
@@ -141,8 +144,7 @@ export function useDraftData({
   // Live draft picks (15s TTL — matches server cache so manual refresh always gets fresh data)
   const livePicksQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'picks'],
-    queryFn: () =>
-      apiFetch<SleeperDraftPick[]>(`/leagues/${slug}/live/draft/${liveDraftId}/picks`),
+    queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft-tool/draft/${liveDraftId}/picks`),
     staleTime: 15_000,
     refetchInterval: pollIntervalMs,
     enabled: !!liveDraftId,

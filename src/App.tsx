@@ -16,7 +16,6 @@ import AdminSettings from '@/pages/AdminSettings'
 import Dues from '@/pages/Dues'
 import Picks from '@/pages/Picks'
 import DraftBoard from '@/pages/DraftBoard'
-import DraftGrades from '@/pages/DraftGrades'
 import HubLayout, { useHub } from '@/components/hub/HubLayout'
 import HubHome from '@/pages/hub/HubHome'
 import LeagueOverview from '@/pages/hub/LeagueOverview'
@@ -30,6 +29,7 @@ import HubManagers from '@/pages/hub/HubManagers'
 import HubManagerProfile from '@/pages/hub/HubManagerProfile'
 import HubTrades from '@/pages/hub/HubTrades'
 import HubTradeDetail from '@/pages/hub/HubTradeDetail'
+import HubDrafts from '@/pages/hub/HubDrafts'
 
 /** `/` → the last league viewed, else the first accessible one, else the picker
  *  (or setup, for a fresh admin with no leagues yet). */
@@ -107,6 +107,7 @@ function AppRoutes() {
           <Route index element={<HomeGate />} />
 
           <Route path="settings" element={<AdminOnly><AdminSettings /></AdminOnly>} />
+          <Route path="draft-board" element={<AdminOnly><DraftBoard /></AdminOnly>} />
 
           <Route path="l" element={<HubHome />} />
           <Route path="l/:slug" element={<HubLayout />}>
@@ -125,10 +126,9 @@ function AppRoutes() {
             <Route path="trades/:tradeId" element={<HubTradeDetail />} />
             <Route path="rosters" element={<Rosters />} />
             <Route path="rosters/:teamId" element={<TeamDetail />} />
-            <Route path="draft" element={<DraftBoard />} />
+            <Route path="draft" element={<HubDrafts />} />
 
             {/* Dynasty only */}
-            <Route path="draft-grades" element={<DynastyOnly><DraftGrades /></DynastyOnly>} />
             <Route path="picks" element={<DynastyOnly><Picks /></DynastyOnly>} />
             <Route path="dues" element={<DynastyOnly><Dues /></DynastyOnly>} />
             <Route path="bylaws" element={<DynastyOnly><Bylaws /></DynastyOnly>} />

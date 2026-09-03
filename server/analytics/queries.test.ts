@@ -101,18 +101,28 @@ describe('getStandings', () => {
 })
 
 describe('getH2HMatrix / game log', () => {
-  it('produces a symmetric record', () => {
+  it('produces a symmetric combined record', () => {
     const m = getH2HMatrix(db, 'test')
-    expect(m.cells.A.B.wins).toBe(4)
-    expect(m.cells.A.B.losses).toBe(1)
-    expect(m.cells.B.A.wins).toBe(1)
-    expect(m.cells.B.A.losses).toBe(4)
-    expect(m.cells.A.B.meetings).toBe(5)
+    expect(m.cells.A.B.combined.wins).toBe(4)
+    expect(m.cells.A.B.combined.losses).toBe(1)
+    expect(m.cells.A.B.combined.meetings).toBe(5)
+    expect(m.cells.B.A.combined.wins).toBe(1)
+    expect(m.cells.B.A.combined.losses).toBe(4)
   })
 
-  it('game log lists every meeting oldest-first with margins', () => {
+  it('splits regular season and playoff meetings', () => {
+    const m = getH2HMatrix(db, 'test')
+    // A: 3-1 regular (wk1, wk2, L2 wk1 L, L2 wk2 W), 1-0 playoff (L1 wk3 final)
+    expect(m.cells.A.B.regular).toMatchObject({ wins: 3, losses: 1, meetings: 4 })
+    expect(m.cells.A.B.playoff).toMatchObject({ wins: 1, losses: 0, meetings: 1 })
+    expect(m.cells.B.A.playoff).toMatchObject({ wins: 0, losses: 1 })
+  })
+
+  it('game log carries combined + split records', () => {
     const log = getH2HGameLog(db, 'test', 'A', 'B')
-    expect(log.record).toEqual({ wins: 4, losses: 1, ties: 0 })
+    expect(log.record.combined).toEqual({ wins: 4, losses: 1, ties: 0 })
+    expect(log.record.regular).toEqual({ wins: 3, losses: 1, ties: 0 })
+    expect(log.record.playoff).toEqual({ wins: 1, losses: 0, ties: 0 })
     expect(log.games).toHaveLength(5)
     expect(log.games[0]).toMatchObject({ season: 2023, week: 1, margin: 50 })
     expect(log.games[2]).toMatchObject({ week: 3, isPlayoff: true })

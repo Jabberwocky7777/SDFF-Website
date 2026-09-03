@@ -267,13 +267,20 @@ export interface RecordEntry {
 
 export const getRecords = (slug: string) => hubFetch<RecordEntry[]>(`/leagues/${slug}/records`)
 
-export interface H2HCell {
+export interface H2HRecord {
   wins: number
   losses: number
   ties: number
   pointsFor: number
   pointsAgainst: number
   meetings: number
+}
+
+/** combined = regular + playoff (consolation games excluded everywhere). */
+export interface H2HCell {
+  combined: H2HRecord
+  regular: H2HRecord
+  playoff: H2HRecord
 }
 
 export interface H2HMatrix {
@@ -294,12 +301,18 @@ export interface H2HGame {
   isConsolation: boolean
 }
 
+export interface H2HWLT {
+  wins: number
+  losses: number
+  ties: number
+}
+
 export interface H2HGameLog {
   a: string
   b: string
   aName: string
   bName: string
-  record: { wins: number; losses: number; ties: number }
+  record: { combined: H2HWLT; regular: H2HWLT; playoff: H2HWLT }
   games: H2HGame[]
 }
 
@@ -352,14 +365,23 @@ export interface ManagerProfile {
   career: StandingRow
   seasons: SeasonSummary[]
   perSeason: Array<{ season: number; row: StandingRow }>
-  nemesis: (H2HCell & { userId: string; name: string }) | null
-  favorite: (H2HCell & { userId: string; name: string }) | null
+  nemesis: (H2HRecord & { userId: string; name: string }) | null
+  favorite: (H2HRecord & { userId: string; name: string }) | null
 }
 
 export const getManagerProfile = (slug: string, userId: string) =>
   hubFetch<ManagerProfile>(`/leagues/${slug}/managers/${userId}`)
 
-// ── Trades (dynasty §13) ────────────────────────────────────────────────────
+// ── Trades (§13) ────────────────────────────────────────────────────────────
+
+export interface SeasonLine {
+  season: number
+  pointsRostered: number
+  pointsStarted: number
+  par: number
+  weeksRostered: number
+  weeksStarted: number
+}
 
 export interface TradeAssetView {
   type: 'player' | 'pick' | 'faab'
@@ -368,6 +390,7 @@ export interface TradeAssetView {
   position: string | null
   fromUserId: string | null
   toUserId: string | null
+  bySeason: SeasonLine[]
   pointsRostered: number
   pointsStarted: number
   par: number
@@ -382,6 +405,7 @@ export interface TradeSideView {
   userId: string
   name: string
   received: TradeAssetView[]
+  bySeason: SeasonLine[]
   totals: {
     pointsRostered: number
     pointsStarted: number
@@ -398,6 +422,8 @@ export interface TradeView {
   date: number | null
   isOffseason: boolean
   teamCount: number
+  /** dynasty → per-season breakdowns; redraft → the single trade season. */
+  multiSeason: boolean
   sides: TradeSideView[]
   netStartedDiff: number
   headline: string
@@ -414,3 +440,45 @@ export const getTrades = (slug: string, opts: { season?: number; userId?: string
 
 export const getTrade = (slug: string, tradeId: string) =>
   hubFetch<TradeView>(`/leagues/${slug}/trades/${tradeId}`)
+
+// ── Historical draft boards ─────────────────────────────────────────────────
+
+export interface DraftSeasonSummary {
+  season: number
+  draftId: string
+  rounds: number
+  teams: number
+  totalPicks: number
+}
+
+export interface DraftSlot {
+  slot: number
+  rosterId: number
+  name: string
+}
+
+export interface DraftPickView {
+  pickNo: number
+  round: number
+  slot: number
+  rosterId: number
+  userId: string | null
+  managerName: string | null
+  viaTrade: boolean
+  playerId: string | null
+  playerName: string | null
+  position: string | null
+  nflTeam: string | null
+  isKeeper: boolean
+}
+
+export interface DraftBoardView extends DraftSeasonSummary {
+  slots: DraftSlot[]
+  picks: DraftPickView[]
+}
+
+export const getDraftSeasons = (slug: string) =>
+  hubFetch<DraftSeasonSummary[]>(`/leagues/${slug}/drafts`)
+
+export const getDraftBoard = (slug: string, season: number) =>
+  hubFetch<DraftBoardView>(`/leagues/${slug}/drafts/${season}`)

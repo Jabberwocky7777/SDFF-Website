@@ -42,7 +42,6 @@ function tabsFor(meta: LeagueMeta): Tab[] {
   ]
   if (meta.type === 'dynasty') {
     tabs.push(
-      { to: 'draft-grades', label: 'Draft Grades' },
       { to: 'picks', label: 'Rookie Picks' },
       { to: 'dues', label: 'Dues' },
       { to: 'bylaws', label: 'Bylaws' },
