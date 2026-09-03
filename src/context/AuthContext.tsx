@@ -33,12 +33,6 @@ export function useAuth(): AuthContextValue {
   return ctx
 }
 
-/** The flagship (first) league has the full dynasty site; other codes land in the hub. */
-export function useHasFullSite(): boolean {
-  const { admin, slugs, flagshipSlug } = useAuth()
-  return admin || (!!flagshipSlug && slugs.includes(flagshipSlug))
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState(false)
   const [slugs, setSlugs] = useState<string[]>([])

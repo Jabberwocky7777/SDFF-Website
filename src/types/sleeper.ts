@@ -68,7 +68,7 @@ export interface SleeperMatchup {
 export interface SleeperNflState {
   week: number
   season: string
-  season_type: 'pre' | 'regular' | 'post'
+  season_type: 'pre' | 'regular' | 'post' | 'off'
   display_week: number
   leg: number
   season_start_date: string

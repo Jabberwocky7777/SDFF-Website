@@ -15,10 +15,13 @@
  * `:slug` is validated against config by `requireLeagueAccess` (mounted in
  * index.ts), so handlers can trust it.
  */
-import { Router, type Request } from 'express'
+import express, { Router, type Request } from 'express'
 import { getDb } from '../db/index.js'
 import { getLeague } from '../config/leagues.js'
-import { isGameDay, serveCached } from '../sleeper/proxy.js'
+import { readCache, readStale, writeCache } from '../cache.js'
+import { getSleeperClient } from '../sleeper/client.js'
+import { fetchKtcHtmlRankings, readFlockCsv, writeFlockCsv } from '../sleeper/external.js'
+import { isGameDay, serveCached, serveCachedUrl } from '../sleeper/proxy.js'
 import {
   getFamily,
   getH2HGameLog,
@@ -31,6 +34,7 @@ import {
 } from '../analytics/queries.js'
 import { getAllPlay } from '../analytics/allplay.js'
 import { getPowerRankings } from '../analytics/powerRankings.js'
+import { getTradeDetail, getTradeFeed } from '../analytics/trades.js'
 
 const router = Router({ mergeParams: true })
 
@@ -49,6 +53,20 @@ router.get('/', (req, res) => {
   const family = getFamily(db, slug)
   const cfg = getLeague(slug)!
   const seasons = getSeasons(db, slug)
+
+  let lastSyncAt: number | null = null
+  if (family) {
+    const row = db
+      .prepare(
+        `SELECT MAX(sl.finished_at) AS last
+         FROM sync_log sl
+         WHERE sl.status = 'ok'
+           AND sl.league_id IN (SELECT league_id FROM league_season WHERE family_id = ?)`,
+      )
+      .get(family.id) as { last: number | null } | undefined
+    lastSyncAt = row?.last ?? null
+  }
+
   res.json({
     slug,
     displayName: cfg.displayName,
@@ -56,6 +74,7 @@ router.get('/', (req, res) => {
     theme: cfg.theme ?? null,
     ingested: !!family,
     latestCapabilities: seasons[0]?.capabilities ?? null,
+    lastSyncAt,
     seasons,
   })
 })
@@ -97,6 +116,27 @@ router.get('/h2h/:userA/vs/:userB', (req, res) => {
 
 router.get('/managers', (req, res) => {
   res.json(getManagers(getDb(), params(req).slug))
+})
+
+router.get('/trades', (req, res) => {
+  const season = req.query.season ? Number(req.query.season) : undefined
+  const limit = req.query.limit ? Number(req.query.limit) : undefined
+  res.json(
+    getTradeFeed(getDb(), params(req).slug, {
+      season: Number.isFinite(season) ? season : undefined,
+      userId: typeof req.query.userId === 'string' ? req.query.userId : undefined,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    }),
+  )
+})
+
+router.get('/trades/:tradeId', (req, res) => {
+  const trade = getTradeDetail(getDb(), params(req).slug, params(req).tradeId)
+  if (!trade) {
+    res.status(404).json({ error: 'trade not found in this league' })
+    return
+  }
+  res.json(trade)
 })
 
 router.get('/managers/:userId', (req, res) => {
@@ -166,5 +206,167 @@ router.get('/live/matchups/:week', (req, res) => {
   const ttl = isGameDay() ? 3 * 60 : 30 * 60
   void serveCached(res, `lg_${id}_matchups_${week}`, `/league/${id}/matchups/${week}`, ttl)
 })
+
+router.get('/live/transactions/:week', (req, res) => {
+  const id = currentLeagueId(params(req).slug)
+  const week = Number(params(req).week)
+  if (!Number.isInteger(week) || week < 1 || week > 25) {
+    res.status(400).json({ error: 'bad week' })
+    return
+  }
+  void serveCached(res, `lg_${id}_txn_${week}`, `/league/${id}/transactions/${week}`, 2 * 60)
+})
+
+router.get('/live/traded-picks', (req, res) => {
+  const id = currentLeagueId(params(req).slug)
+  void serveCached(res, `lg_${id}_traded_picks`, `/league/${id}/traded_picks`, 5 * 60)
+})
+
+router.get('/live/drafts', (req, res) => {
+  const id = currentLeagueId(params(req).slug)
+  void serveCached(res, `lg_${id}_drafts`, `/league/${id}/drafts`, 5 * 60)
+})
+
+/** draft_id lives on the league object — reuse its cache rather than a 2nd call. */
+router.get('/live/draft-id', async (req, res) => {
+  const id = currentLeagueId(params(req).slug)
+  const key = `lg_${id}_league`
+  const hit = readCache(key, 30 * 60) as { draft_id?: string } | null
+  if (hit) {
+    res.json({ draftId: hit.draft_id ?? null })
+    return
+  }
+  try {
+    const data = (await getSleeperClient().raw(
+      `https://api.sleeper.app/v1/league/${id}`,
+    )) as { draft_id?: string }
+    writeCache(key, data)
+    res.json({ draftId: data?.draft_id ?? null })
+  } catch {
+    const stale = readStale(key) as { draft_id?: string } | null
+    res.json({ draftId: stale?.draft_id ?? null })
+  }
+})
+
+router.get('/live/draft/:draftId', (req, res) => {
+  const draftId = params(req).draftId
+  if (!/^\d+$/.test(draftId)) {
+    res.status(400).json({ error: 'bad draft id' })
+    return
+  }
+  void serveCached(res, `draft_meta_${draftId}`, `/draft/${draftId}`, 5 * 60)
+})
+
+router.get('/live/draft/:draftId/picks', (req, res) => {
+  const draftId = params(req).draftId
+  if (!/^\d+$/.test(draftId)) {
+    res.status(400).json({ error: 'bad draft id' })
+    return
+  }
+  void serveCached(res, `draft_picks_${draftId}`, `/draft/${draftId}/picks`, 15)
+})
+
+// ── Global references (not league-specific, but gated behind league access) ──
+
+router.get('/live/state', (_req, res) => {
+  void serveCached(res, 'nfl_state', '/state/nfl', 30 * 60)
+})
+
+router.get('/live/players', (_req, res) => {
+  void serveCached(res, 'nfl_players', '/players/nfl', 24 * 60 * 60)
+})
+
+router.get('/live/stats/:season', (req, res) => {
+  const season = Number(params(req).season)
+  if (!Number.isInteger(season) || season < 2015 || season > 2100) {
+    res.status(400).json({ error: 'bad season' })
+    return
+  }
+  void serveCached(res, `stats_${season}`, `/stats/nfl/regular/${season}`, 24 * 60 * 60)
+})
+
+router.get('/live/rankings', (_req, res) => {
+  void serveCachedUrl(
+    res,
+    'rankings_fantasycalc',
+    'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&ppr=1&isSuperflex=true',
+    6 * 60 * 60,
+  )
+})
+
+router.get('/live/fantasycalc-rankings', (_req, res) => {
+  void serveCachedUrl(
+    res,
+    'fantasycalc_rankings',
+    // NB: FantasyCalc dropped the `tep` param — it now 404s. Plain superflex only.
+    'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&ppr=1&isSuperflex=true',
+    60 * 60,
+  )
+})
+
+router.get('/live/ktc/rankings', (_req, res) => {
+  void serveCachedUrl(
+    res,
+    'ktc-superflex',
+    'https://api.keeptradecut.com/dynasty-rankings?format=1&count=500&type=1',
+    24 * 60 * 60,
+    {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SDFF-Website/1.0)',
+        Accept: 'application/json',
+      },
+      emptyOnError: true,
+    },
+  )
+})
+
+router.get('/live/ktc-rankings', (_req, res) => {
+  const hit = readCache('ktc_rankings', 60 * 60)
+  if (hit != null) {
+    res.json(hit)
+    return
+  }
+  void fetchKtcHtmlRankings()
+    .then((data) => {
+      writeCache('ktc_rankings', data)
+      res.json(data)
+    })
+    .catch((err) => {
+      const stale = readStale('ktc_rankings')
+      if (stale != null) {
+        res.setHeader('X-Cache-Stale', 'true')
+        res.json(stale)
+      } else {
+        console.error('[ktc]', err)
+        res.status(502).json({ error: 'KTC unavailable and no cache found.' })
+      }
+    })
+})
+
+router.get('/live/flock-rankings', (_req, res) => {
+  try {
+    res.type('text/plain').send(readFlockCsv())
+  } catch (err) {
+    console.error('[flock]', err)
+    res.status(500).json({ error: 'Flock rankings file not found.' })
+  }
+})
+
+router.post(
+  '/live/flock-rankings',
+  express.text({ type: 'text/plain', limit: '1mb' }),
+  (req, res) => {
+    const body = req.body as string
+    if (typeof body !== 'string' || !body.trim()) {
+      res.status(400).json({ error: 'Request body must be CSV text.' })
+      return
+    }
+    try {
+      res.json({ success: true, count: writeFlockCsv(body) })
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to save.' })
+    }
+  },
+)
 
 export default router

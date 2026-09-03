@@ -47,17 +47,17 @@ const squadPotBalance = seasonsCompleted * LEAGUE_CONFIG.squadPotContributionPer
 export default function Dues() {
   const { data: duesOverrides = {} } = useQuery<Record<string, PaymentStatus>>({
     queryKey: ['dues-overrides'],
-    queryFn: () => apiFetch('/api/dues-overrides'),
+    queryFn: () => apiFetch('/dues-overrides'),
   })
 
   const { data: championshipOverrides = [] } = useQuery<ChampionshipRecord[]>({
     queryKey: ['championship-overrides'],
-    queryFn: () => apiFetch('/api/championship-overrides'),
+    queryFn: () => apiFetch('/championship-overrides'),
   })
 
   const { data: squadPotData } = useQuery<{ balance: number | null }>({
     queryKey: ['squad-pot'],
-    queryFn: () => apiFetch('/api/squad-pot'),
+    queryFn: () => apiFetch('/squad-pot'),
   })
 
   const isSquadPotManual = squadPotData?.balance != null

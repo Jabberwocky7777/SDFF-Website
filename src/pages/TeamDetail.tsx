@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useLeagueSlug } from '@/context/LeagueScope'
 import SectionHeader from '@/components/ui/SectionHeader'
 import Card from '@/components/ui/Card'
 import ShieldAvatar from '@/components/ui/ShieldAvatar'
@@ -47,6 +48,7 @@ function PlayerRow({ player }: { player: EnrichedPlayer }) {
 
 export default function TeamDetail() {
   const { teamId } = useParams<{ teamId: string }>()
+  const slug = useLeagueSlug()
   const { data: rosters, isLoading: r } = useRosters()
   const { data: users, isLoading: u } = useUsers()
   const { data: players, isLoading: p } = usePlayers()
@@ -72,7 +74,7 @@ export default function TeamDetail() {
 
   return (
     <div>
-      <Link to="/rosters" className="text-gold/70 text-small font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
+      <Link to={`/l/${slug}/rosters`} className="text-gold/70 text-small font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
         ← All Rosters
       </Link>
 

@@ -16,6 +16,7 @@ import { ingestAll } from './ingest.js'
 import { resolveNflState } from './nflState.js'
 import { acquireSyncLock, releaseSyncLock, syncLockHolder } from './lock.js'
 import { kickBackfillQueue } from './trigger.js'
+import { log } from '../log.js'
 
 let lastRun = 0
 let lastError: string | null = null
@@ -26,7 +27,7 @@ export function schedulerStatus(): { running: boolean; lastRun: number; lastErro
 
 async function runIncremental(trigger: string): Promise<void> {
   if (!acquireSyncLock(`incremental:${trigger}`)) {
-    console.log(`[scheduler] skip (${trigger}) — ${syncLockHolder()} is already running`)
+    log.info('scheduler skip — lock held', { trigger, holder: syncLockHolder() })
     return
   }
   const started = Date.now()
@@ -38,14 +39,17 @@ async function runIncremental(trigger: string): Promise<void> {
       mode: 'incremental',
       currentNflWeek: state.week,
       currentNflSeason: state.season,
-      log: (m) => console.log(`[sync] ${m}`),
+      log: (m) => log.debug('sync', { line: m }),
     })
     lastRun = Date.now()
     lastError = null
-    console.log(`[scheduler] incremental (${trigger}) done in ${((Date.now() - started) / 1000).toFixed(1)}s`)
+    log.info('scheduler incremental done', {
+      trigger,
+      seconds: Number(((Date.now() - started) / 1000).toFixed(1)),
+    })
   } catch (err) {
     lastError = (err as Error).message
-    console.error(`[scheduler] incremental (${trigger}) failed:`, err)
+    log.error('scheduler incremental failed', { trigger, err: lastError })
   } finally {
     releaseSyncLock()
     kickBackfillQueue() // run any backfills that were queued while we held the lock
@@ -60,11 +64,11 @@ export function triggerIncremental(): void {
 export function startScheduler(): void {
   const isDev = process.env.NODE_ENV !== 'production'
   if (process.env.SYNC_ENABLED === '0') {
-    console.log('[scheduler] disabled (SYNC_ENABLED=0)')
+    log.info('scheduler disabled (SYNC_ENABLED=0)')
     return
   }
   if (isDev && process.env.SYNC_IN_DEV !== '1') {
-    console.log('[scheduler] disabled in dev (set SYNC_IN_DEV=1 to enable)')
+    log.info('scheduler disabled in dev (set SYNC_IN_DEV=1 to enable)')
     return
   }
 
@@ -79,5 +83,5 @@ export function startScheduler(): void {
   // Warm start shortly after boot.
   setTimeout(() => void runIncremental('startup'), 20_000)
 
-  console.log(`[scheduler] started (tz=${tz})`)
+  log.info('scheduler started', { tz })
 }

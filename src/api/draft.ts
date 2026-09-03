@@ -16,14 +16,16 @@ export interface SleeperDraftInfo {
   metadata?: Record<string, string>
 }
 
-export const fetchDraftInfo = (draftId: string) =>
-  apiFetch<SleeperDraftInfo>(`/draft/${draftId}`)
+const live = (slug: string) => `/leagues/${slug}/live`
 
-export const fetchDraftPicks = (draftId: string) =>
-  apiFetch<SleeperDraftPick[]>(`/draft/${draftId}/picks`)
+export const fetchDraftInfo = (slug: string, draftId: string) =>
+  apiFetch<SleeperDraftInfo>(`${live(slug)}/draft/${draftId}`)
 
-export const fetchKTCRankings = () =>
-  apiFetch<KTCPlayer[]>('/ktc/rankings')
+export const fetchDraftPicks = (slug: string, draftId: string) =>
+  apiFetch<SleeperDraftPick[]>(`${live(slug)}/draft/${draftId}/picks`)
 
-export const fetchSleeperStats = (season: number) =>
-  apiFetch<Record<string, SleeperProjection>>(`/stats/${season}`)
+export const fetchKTCRankings = (slug: string) =>
+  apiFetch<KTCPlayer[]>(`${live(slug)}/ktc/rankings`)
+
+export const fetchSleeperStats = (slug: string, season: number) =>
+  apiFetch<Record<string, SleeperProjection>>(`${live(slug)}/stats/${season}`)

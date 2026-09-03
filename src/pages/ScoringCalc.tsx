@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '@/components/ui/Card'
 import GoldRule from '@/components/ui/GoldRule'
+import { useLeagueSlug } from '@/context/LeagueScope'
 
 interface Stats {
   passYds: number; passTDs: number; ints: number; pick6s: number
@@ -55,6 +56,7 @@ function NumInput({ label, value, onChange }: { label: string; value: number; on
 }
 
 export default function ScoringCalc() {
+  const slug = useLeagueSlug()
   const [stats, setStats] = useState<Stats>(DEFAULT)
   const set = <K extends keyof Stats>(key: K, val: Stats[K]) => setStats((s) => ({ ...s, [key]: val }))
 
@@ -63,7 +65,7 @@ export default function ScoringCalc() {
 
   return (
     <div>
-      <Link to="/bylaws" className="text-gold/70 text-small font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
+      <Link to={`/l/${slug}/bylaws`} className="text-gold/70 text-small font-sans hover:text-gold transition-colors mb-5 inline-flex items-center gap-1">
         ← Rules & FAQs
       </Link>
 

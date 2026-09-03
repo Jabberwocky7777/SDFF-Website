@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useLeagueSlug } from '@/context/LeagueScope'
 import SectionHeader from '@/components/ui/SectionHeader'
 import Card from '@/components/ui/Card'
 import GoldRule from '@/components/ui/GoldRule'
@@ -93,6 +94,7 @@ function AgeRow({ roster }: AgeRowProps) {
 }
 
 export default function Rosters() {
+  const slug = useLeagueSlug()
   const { data: rosters, isLoading: r } = useRosters()
   const { data: users, isLoading: u } = useUsers()
   const { data: players, isLoading: p } = usePlayers()
@@ -140,7 +142,7 @@ export default function Rosters() {
           const hasPlayers = roster.starters.length > 0 || roster.bench.length > 0
 
           return (
-            <Link key={roster.rosterId} to={`/rosters/${roster.rosterId}`}>
+            <Link key={roster.rosterId} to={`/l/${slug}/rosters/${roster.rosterId}`}>
               <Card className="hover:border-border transition-all duration-150 cursor-pointer h-full">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4 pb-3 border-b border-borderLow">

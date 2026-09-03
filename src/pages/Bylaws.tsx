@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import GoldRule from '@/components/ui/GoldRule'
 import { bylawsSections } from '@/data/bylaws'
+import { useLeagueSlug } from '@/context/LeagueScope'
 
 function AccordionItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false)
@@ -32,6 +33,7 @@ function AccordionItem({ question, answer }: { question: string; answer: string 
 }
 
 export default function Bylaws() {
+  const slug = useLeagueSlug()
   return (
     <div>
       <div className="mb-8">
@@ -50,7 +52,7 @@ export default function Bylaws() {
           </div>
         </div>
         <Link
-          to="/bylaws/scoring"
+          to={`/l/${slug}/bylaws/scoring`}
           className="shrink-0 text-gold text-small font-sans border border-border px-4 py-2 rounded-lg hover:bg-goldLow transition-colors ml-4"
         >
           Open →

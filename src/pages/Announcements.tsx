@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import GoldRule from '@/components/ui/GoldRule'
+import { useAuth } from '@/context/AuthContext'
+import { useLeagueSlug } from '@/context/LeagueScope'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -11,6 +13,8 @@ function formatDate(iso: string): string {
 
 export default function Announcements() {
   const { data: announcements, isLoading } = useAnnouncements()
+  const { admin } = useAuth()
+  const slug = useLeagueSlug()
 
   return (
     <div>
@@ -19,12 +23,14 @@ export default function Announcements() {
           <h1 className="font-sans text-h1 font-bold text-text mb-1">Announcements</h1>
           <p className="text-body text-muted">League news and updates from the commissioner.</p>
         </div>
-        <Link
-          to="/admin"
-          className="text-small font-medium text-muted hover:text-gold transition-colors"
-        >
-          Admin →
-        </Link>
+        {admin && (
+          <Link
+            to={`/l/${slug}/admin`}
+            className="text-small font-medium text-muted hover:text-gold transition-colors"
+          >
+            Admin →
+          </Link>
+        )}
       </div>
 
       {isLoading && <SkeletonLoader rows={4} />}

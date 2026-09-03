@@ -15,7 +15,10 @@ import { bootstrapLeaguesIfEmpty } from './config/bootstrap.js'
 import { maybeResetAdmin } from './auth/admin.js'
 import { getDb } from './db/index.js'
 import { die, fatal, trace } from './fatal.js'
+import { httpLogger, log } from './log.js'
+import { securityHeaders } from './security.js'
 import { startScheduler } from './sync/scheduler.js'
+import { startBackupJob } from './sync/backup.js'
 import { autoBackfillIfNeeded } from './sync/autobackfill.js'
 import {
   attachAuth,
@@ -50,6 +53,7 @@ try {
   const slugs = getLeagues(db).map((l) => l.slug)
   trace(`leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
   startScheduler()
+  startBackupJob()
 } catch (err) {
   dbError = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
   fatal('database initialisation failed — starting in diagnostic mode', err)
@@ -86,6 +90,15 @@ if (dbError) {
 } else {
   // ── Normal app ──────────────────────────────────────────────────────────
   const distPath = path.join(__dirname, '..', 'dist')
+
+  app.use(httpLogger)
+  app.use(securityHeaders)
+
+  // CORS: same-origin only in production (no middleware = browser blocks
+  // cross-origin XHR). CORS_ORIGIN opts a specific front-end origin back in.
+  const corsOrigin = IS_DEV ? 'http://localhost:5173' : process.env.CORS_ORIGIN
+  if (corsOrigin) app.use(cors({ origin: corsOrigin, credentials: true }))
+
   app.use(express.static(distPath))
   app.get('/{*splat}', (_req, res, next) => {
     if (_req.path.startsWith('/api/')) return next()
@@ -93,12 +106,6 @@ if (dbError) {
   })
 
   app.use(express.json())
-  app.use((_req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('X-Frame-Options', 'DENY')
-    next()
-  })
-  if (IS_DEV) app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 
   app.use(attachAuth)
   app.use('/api', setupRouter)
@@ -120,12 +127,12 @@ if (dbError) {
 
   const server = app.listen(PORT, () => {
     trace(`listening on :${PORT}`)
-    if (IS_DEV) console.log('[dev] open the app to set up the admin password / add leagues')
+    if (IS_DEV) log.info('dev — open the app to set up the admin password / add leagues')
     setTimeout(() => {
       try {
         autoBackfillIfNeeded(getDb())
       } catch (err) {
-        console.error('[autobackfill] could not start:', err)
+        log.error('autobackfill could not start', { err: (err as Error).message })
       }
     }, 8000)
   })

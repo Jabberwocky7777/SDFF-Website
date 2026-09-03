@@ -4,6 +4,7 @@ import { usePlayers } from '@/hooks/usePlayers'
 import { parseFlockCsv, normalizePlayerName } from '@/lib/parseFlockCsv'
 import { apiFetch, ApiError } from '@/api/client'
 import { API_BASE } from '@/config'
+import { useLeagueSlug } from '@/context/LeagueScope'
 import type { Position } from '@/lib/parseFlockCsv'
 import type { SleeperDraftPick } from '@/hooks/useDraftPicks'
 
@@ -102,6 +103,7 @@ export function useDraftData({
   pollIntervalMs = 30_000,
 }: UseDraftDataOptions) {
   const queryClient = useQueryClient()
+  const slug = useLeagueSlug()
 
   // Sleeper player map (24h, shared with rest of app)
   const { data: playersMap } = usePlayers()
@@ -109,28 +111,28 @@ export function useDraftData({
   // Flock rankings CSV (60s stale)
   const flockQuery = useQuery({
     queryKey: ['flock-rankings'],
-    queryFn: () => apiTextFetch('/flock-rankings'),
+    queryFn: () => apiTextFetch(`/leagues/${slug}/live/flock-rankings`),
     staleTime: 60_000,
   })
 
   // KTC dynasty rankings (1h stale)
   const ktcQuery = useQuery({
     queryKey: ['ktc-rankings'],
-    queryFn: () => apiFetch<KtcPlayer[]>('/ktc-rankings'),
+    queryFn: () => apiFetch<KtcPlayer[]>(`/leagues/${slug}/live/ktc-rankings`),
     staleTime: 60 * 60_000,
   })
 
   // FantasyCalc dynasty rankings (1h stale)
   const fcQuery = useQuery({
     queryKey: ['fantasycalc-rankings'],
-    queryFn: () => apiFetch<FcEntry[]>('/fantasycalc-rankings'),
+    queryFn: () => apiFetch<FcEntry[]>(`/leagues/${slug}/live/fantasycalc-rankings`),
     staleTime: 60 * 60_000,
   })
 
   // Live draft metadata (status, settings.teams/rounds)
   const liveMetaQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'meta'],
-    queryFn: () => apiFetch<SleeperDraftMeta>(`/draft/${liveDraftId}`),
+    queryFn: () => apiFetch<SleeperDraftMeta>(`/leagues/${slug}/live/draft/${liveDraftId}`),
     staleTime: 30_000,
     refetchInterval: pollIntervalMs,
     enabled: !!liveDraftId,
@@ -139,7 +141,8 @@ export function useDraftData({
   // Live draft picks (15s TTL — matches server cache so manual refresh always gets fresh data)
   const livePicksQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'picks'],
-    queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft/${liveDraftId}/picks`),
+    queryFn: () =>
+      apiFetch<SleeperDraftPick[]>(`/leagues/${slug}/live/draft/${liveDraftId}/picks`),
     staleTime: 15_000,
     refetchInterval: pollIntervalMs,
     enabled: !!liveDraftId,

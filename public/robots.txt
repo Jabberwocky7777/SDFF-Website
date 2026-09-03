@@ -1,0 +1,3 @@
+# Private league hub — everything is behind an access code.
+User-agent: *
+Disallow: /

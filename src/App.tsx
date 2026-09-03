@@ -1,11 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider, useAuth, useHasFullSite } from '@/context/AuthContext'
-import { LeaguesProvider } from '@/context/LeaguesContext'
+import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { LeaguesProvider, useLeagues } from '@/context/LeaguesContext'
 import SplashScreen from '@/components/auth/SplashScreen'
 import SetupScreen from '@/components/auth/SetupScreen'
 import RootLayout from '@/components/layout/RootLayout'
-import Dashboard from '@/pages/Dashboard'
-import Standings from '@/pages/Standings'
+import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import Rosters from '@/pages/Rosters'
 import TeamDetail from '@/pages/TeamDetail'
 import Timeline from '@/pages/Timeline'
@@ -18,7 +17,7 @@ import Dues from '@/pages/Dues'
 import Picks from '@/pages/Picks'
 import DraftBoard from '@/pages/DraftBoard'
 import DraftGrades from '@/pages/DraftGrades'
-import HubLayout from '@/components/hub/HubLayout'
+import HubLayout, { useHub } from '@/components/hub/HubLayout'
 import HubHome from '@/pages/hub/HubHome'
 import LeagueOverview from '@/pages/hub/LeagueOverview'
 import HubStandings from '@/pages/hub/HubStandings'
@@ -29,20 +28,37 @@ import HubRecords from '@/pages/hub/HubRecords'
 import HubPowerRankings from '@/pages/hub/HubPowerRankings'
 import HubManagers from '@/pages/hub/HubManagers'
 import HubManagerProfile from '@/pages/hub/HubManagerProfile'
+import HubTrades from '@/pages/hub/HubTrades'
+import HubTradeDetail from '@/pages/hub/HubTradeDetail'
 
+/** `/` → the last league viewed, else the first accessible one, else the picker
+ *  (or setup, for a fresh admin with no leagues yet). */
 function HomeGate() {
   const { hasLeagues, admin } = useAuth()
-  const fullSite = useHasFullSite()
-  if (!hasLeagues) return <Navigate to={admin ? '/settings' : '/l'} replace />
-  return fullSite ? <Dashboard /> : <Navigate to="/l" replace />
-}
-
-function SdffOnly({ children }: { children: React.ReactNode }) {
-  return useHasFullSite() ? <>{children}</> : <Navigate to="/l" replace />
+  const { leagues, lastLeague, loading } = useLeagues()
+  if (loading) return <SkeletonLoader rows={4} />
+  if (!hasLeagues && admin) return <Navigate to="/settings" replace />
+  const target =
+    lastLeague && leagues.some((l) => l.slug === lastLeague)
+      ? lastLeague
+      : leagues[0]?.slug
+  return <Navigate to={target ? `/l/${target}` : '/l'} replace />
 }
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
   return useAuth().admin ? <>{children}</> : <Navigate to="/" replace />
+}
+
+/** Gate a tab to dynasty leagues (SDFF content). Renders inside HubLayout's Outlet. */
+function DynastyOnly({ children }: { children: React.ReactNode }) {
+  const { meta, slug } = useHub()
+  return meta.type === 'dynasty' ? <>{children}</> : <Navigate to={`/l/${slug}`} replace />
+}
+
+/** Any unmatched path under /l/:slug lands back on that league's overview. */
+function LeagueCatchAll() {
+  const { slug } = useHub()
+  return <Navigate to={`/l/${slug}`} replace />
 }
 
 function StorageBanner() {
@@ -92,21 +108,6 @@ function AppRoutes() {
 
           <Route path="settings" element={<AdminOnly><AdminSettings /></AdminOnly>} />
 
-          {/* Flagship dynasty pages */}
-          <Route path="standings" element={<SdffOnly><Standings /></SdffOnly>} />
-          <Route path="rosters" element={<SdffOnly><Rosters /></SdffOnly>} />
-          <Route path="rosters/:teamId" element={<SdffOnly><TeamDetail /></SdffOnly>} />
-          <Route path="timeline" element={<SdffOnly><Timeline /></SdffOnly>} />
-          <Route path="bylaws" element={<SdffOnly><Bylaws /></SdffOnly>} />
-          <Route path="bylaws/scoring" element={<SdffOnly><ScoringCalc /></SdffOnly>} />
-          <Route path="announcements" element={<Announcements />} />
-          <Route path="admin" element={<SdffOnly><Admin /></SdffOnly>} />
-          <Route path="dues" element={<SdffOnly><Dues /></SdffOnly>} />
-          <Route path="picks" element={<SdffOnly><Picks /></SdffOnly>} />
-          <Route path="draft" element={<SdffOnly><DraftBoard /></SdffOnly>} />
-          <Route path="draft-grades" element={<SdffOnly><DraftGrades /></SdffOnly>} />
-
-          {/* Multi-league hub */}
           <Route path="l" element={<HubHome />} />
           <Route path="l/:slug" element={<HubLayout />}>
             <Route index element={<LeagueOverview />} />
@@ -118,6 +119,29 @@ function AppRoutes() {
             <Route path="power-rankings" element={<HubPowerRankings />} />
             <Route path="managers" element={<HubManagers />} />
             <Route path="managers/:userId" element={<HubManagerProfile />} />
+
+            {/* Every league */}
+            <Route path="trades" element={<HubTrades />} />
+            <Route path="trades/:tradeId" element={<HubTradeDetail />} />
+            <Route path="rosters" element={<Rosters />} />
+            <Route path="rosters/:teamId" element={<TeamDetail />} />
+            <Route path="draft" element={<DraftBoard />} />
+
+            {/* Dynasty only */}
+            <Route path="draft-grades" element={<DynastyOnly><DraftGrades /></DynastyOnly>} />
+            <Route path="picks" element={<DynastyOnly><Picks /></DynastyOnly>} />
+            <Route path="dues" element={<DynastyOnly><Dues /></DynastyOnly>} />
+            <Route path="bylaws" element={<DynastyOnly><Bylaws /></DynastyOnly>} />
+            <Route path="bylaws/scoring" element={<DynastyOnly><ScoringCalc /></DynastyOnly>} />
+            <Route path="timeline" element={<DynastyOnly><Timeline /></DynastyOnly>} />
+            <Route path="news" element={<DynastyOnly><Announcements /></DynastyOnly>} />
+            <Route
+              path="admin"
+              element={<DynastyOnly><AdminOnly><Admin /></AdminOnly></DynastyOnly>}
+            />
+
+            {/* Unknown sub-path → back to the league overview */}
+            <Route path="*" element={<LeagueCatchAll />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

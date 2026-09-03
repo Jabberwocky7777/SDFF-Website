@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDraftData, type EnrichedPlayer, type DynastyProfile } from '@/hooks/useDraftData'
 import { parseFlockCsv } from '@/lib/parseFlockCsv'
 import { apiFetch } from '@/api/client'
+import { useLeagueSlug } from '@/context/LeagueScope'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import type { Position } from '@/lib/parseFlockCsv'
 
@@ -102,6 +103,7 @@ function StatusPill({ status }: { status: string | null }) {
 type UploadState = 'idle' | 'ready' | 'uploading' | 'success' | 'error'
 
 function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUploaded: () => void }) {
+  const slug = useLeagueSlug()
   const [dragOver, setDragOver]       = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [uploadMsg, setUploadMsg]     = useState('')
@@ -153,11 +155,14 @@ function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUpl
     if (!preview) return
     setUploadState('uploading')
     try {
-      const result = await apiFetch<{ success: boolean; count: number }>('/flock-rankings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: preview.csv,
-      })
+      const result = await apiFetch<{ success: boolean; count: number }>(
+        `/leagues/${slug}/live/flock-rankings`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: preview.csv,
+        },
+      )
       localStorage.setItem(LS_FLOCK_TS, String(Date.now()))
       setUploadState('success')
       setUploadMsg(`✓ Updated — ${result.count} players loaded`)

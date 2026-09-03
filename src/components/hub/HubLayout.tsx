@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
-import { NavLink, Navigate, Outlet, useOutletContext, useParams } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getLeagueMeta, type LeagueMeta } from '@/api/hub'
 import { useLeagues } from '@/context/LeaguesContext'
 import { useAuth } from '@/context/AuthContext'
+import { LeagueScope } from '@/context/LeagueScope'
 import LeagueSwitcher from './LeagueSwitcher'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import { FreshnessNote } from './FreshnessNote'
 
 export interface HubContext {
   slug: string
@@ -16,18 +19,43 @@ export function useHub(): HubContext {
   return useOutletContext<HubContext>()
 }
 
-const TABS = [
-  { to: '', label: 'Overview', end: true },
-  { to: 'standings', label: 'Standings' },
-  { to: 'history', label: 'History' },
-  { to: 'head-to-head', label: 'Head-to-Head' },
-  { to: 'records', label: 'Records' },
-  { to: 'power-rankings', label: 'Power' },
-  { to: 'managers', label: 'Managers' },
-]
+interface Tab {
+  to: string
+  label: string
+  end?: boolean
+}
+
+/** Sub-nav is capability-aware: everyone gets the analytics + roster/draft tabs;
+ *  dynasty leagues additionally get the SDFF content tabs. */
+function tabsFor(meta: LeagueMeta): Tab[] {
+  const tabs: Tab[] = [
+    { to: '', label: 'Overview', end: true },
+    { to: 'standings', label: 'Standings' },
+    { to: 'history', label: 'History' },
+    { to: 'head-to-head', label: 'Head-to-Head' },
+    { to: 'records', label: 'Records' },
+    { to: 'power-rankings', label: 'Power' },
+    { to: 'managers', label: 'Managers' },
+    { to: 'trades', label: 'Trades' },
+    { to: 'rosters', label: 'Rosters' },
+    { to: 'draft', label: 'Draft' },
+  ]
+  if (meta.type === 'dynasty') {
+    tabs.push(
+      { to: 'draft-grades', label: 'Draft Grades' },
+      { to: 'picks', label: 'Rookie Picks' },
+      { to: 'dues', label: 'Dues' },
+      { to: 'bylaws', label: 'Bylaws' },
+      { to: 'timeline', label: 'Calendar' },
+      { to: 'news', label: 'News' },
+    )
+  }
+  return tabs
+}
 
 export default function HubLayout() {
   const { slug = '' } = useParams()
+  const location = useLocation()
   const { leagues, loading, rememberLeague } = useLeagues()
   const { slugs, admin } = useAuth()
 
@@ -63,6 +91,8 @@ export default function HubLayout() {
     return <SkeletonLoader rows={6} />
   }
 
+  const tabs = tabsFor(meta)
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
@@ -77,7 +107,7 @@ export default function HubLayout() {
 
       <div className="-mx-6 px-6 mb-8 overflow-x-auto">
         <div className="flex gap-1 bg-surfaceHi border border-borderLow rounded-lg p-1 w-max min-w-full sm:min-w-0 sm:w-fit">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <NavLink
               key={t.to}
               to={t.to ? `/l/${slug}/${t.to}` : `/l/${slug}`}
@@ -94,7 +124,13 @@ export default function HubLayout() {
         </div>
       </div>
 
-      <Outlet context={{ slug, meta } satisfies HubContext} />
+      <LeagueScope slug={slug}>
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet context={{ slug, meta } satisfies HubContext} />
+        </ErrorBoundary>
+      </LeagueScope>
+
+      <FreshnessNote meta={meta} />
     </div>
   )
 }

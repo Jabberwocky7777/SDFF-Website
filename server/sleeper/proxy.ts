@@ -45,3 +45,42 @@ export async function serveCached(
     }
   }
 }
+
+/**
+ * Serve an arbitrary external (non-Sleeper) URL with the same file-cache +
+ * stale-fallback behaviour. Used for the dynasty ranking sources (FantasyCalc,
+ * KeepTradeCut) which aren't league-scoped but are gated behind league access.
+ */
+export async function serveCachedUrl(
+  res: Response,
+  cacheKey: string,
+  url: string,
+  ttlSeconds: number,
+  opts: { headers?: Record<string, string>; emptyOnError?: boolean } = {},
+): Promise<void> {
+  const hit = readCache(cacheKey, ttlSeconds)
+  if (hit != null) {
+    res.json(hit)
+    return
+  }
+  try {
+    const r = await fetch(url, {
+      headers: opts.headers ?? { 'User-Agent': 'SDFF-Website/1.0' },
+    })
+    if (!r.ok) throw new Error(`${url} returned ${r.status}`)
+    const data = await r.json()
+    writeCache(cacheKey, data)
+    res.json(data)
+  } catch (err) {
+    const stale = readStale(cacheKey)
+    if (stale != null) {
+      res.setHeader('X-Cache-Stale', 'true')
+      res.json(stale)
+    } else if (opts.emptyOnError) {
+      res.json([])
+    } else {
+      console.error('[external proxy]', err)
+      res.status(502).json({ error: 'Upstream API unavailable and no cache found.' })
+    }
+  }
+}

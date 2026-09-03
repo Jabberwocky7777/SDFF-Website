@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/api/client'
+import { useLeagueSlug } from '@/context/LeagueScope'
 
 export interface SleeperDraftPick {
   round: number
@@ -18,9 +19,11 @@ export interface SleeperDraftPick {
 }
 
 export function useDraftPicks(draftId: string | null | undefined) {
+  const slug = useLeagueSlug()
   return useQuery<SleeperDraftPick[]>({
-    queryKey: ['draft-picks', draftId],
-    queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft/${draftId}/picks`),
+    queryKey: ['lg', slug, 'draft', draftId, 'picks'],
+    queryFn: () =>
+      apiFetch<SleeperDraftPick[]>(`/leagues/${slug}/live/draft/${draftId}/picks`),
     staleTime: 30 * 1000,
     enabled: !!draftId,
     refetchInterval: 30 * 1000,

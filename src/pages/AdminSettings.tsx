@@ -9,7 +9,10 @@ import {
   discoverLeagues,
   getAdminLeagues,
   getAdminSettings,
+  getSyncOverview,
   resyncLeague,
+  runBackupNow,
+  runSyncNow,
   saveAdminSettings,
   updateLeague,
   type AdminLeague,
@@ -61,8 +64,131 @@ export default function AdminSettings() {
         <AddLeague onAdded={refetch} />
       </section>
 
+      <SyncOps />
+
       <SettingsSection />
     </div>
+  )
+}
+
+// ── Sync & ops ─────────────────────────────────────────────────────────────
+
+function timeAgo(ms: number | null): string {
+  if (!ms) return 'never'
+  const s = Math.round((Date.now() - ms) / 1000)
+  if (s < 60) return `${s}s ago`
+  if (s < 3600) return `${Math.round(s / 60)}m ago`
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`
+  return `${Math.round(s / 86400)}d ago`
+}
+
+function SyncOps() {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'sync'],
+    queryFn: getSyncOverview,
+    refetchInterval: (q) => (q.state.data?.scheduler.running ? 2000 : 15000),
+  })
+  const sync = useMutation({
+    mutationFn: runSyncNow,
+    onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['admin', 'sync'] }), 500),
+  })
+  const backup = useMutation({
+    mutationFn: runBackupNow,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'sync'] }),
+  })
+
+  return (
+    <section className="space-y-4">
+      <h2 className="font-sans text-h2 font-bold text-text">Sync &amp; backups</h2>
+
+      {isLoading || !data ? (
+        <SkeletonLoader rows={3} />
+      ) : (
+        <div className="bg-surface border border-borderLow rounded-lg p-4 space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span
+              className={`text-small font-semibold ${
+                data.scheduler.running ? 'text-gold' : data.scheduler.lastError ? 'text-red-400' : 'text-muted'
+              }`}
+            >
+              {data.scheduler.running && (
+                <span className="inline-block w-2 h-2 rounded-full bg-gold animate-pulse mr-1.5 align-middle" />
+              )}
+              {data.scheduler.running
+                ? 'Sync running…'
+                : data.scheduler.lastError
+                  ? `Last sync failed: ${data.scheduler.lastError}`
+                  : `Last sync ${timeAgo(data.scheduler.lastRun)}`}
+            </span>
+            <button
+              onClick={() => sync.mutate()}
+              disabled={sync.isPending || data.scheduler.running}
+              className="text-small text-muted hover:text-gold transition-colors disabled:opacity-40"
+            >
+              Sync now
+            </button>
+            <button
+              onClick={() => backup.mutate()}
+              disabled={backup.isPending}
+              className="text-small text-muted hover:text-gold transition-colors disabled:opacity-40 ml-auto"
+            >
+              {backup.isPending ? 'Backing up…' : 'Back up database now'}
+            </button>
+          </div>
+
+          {data.recent.length > 0 && (
+            <div className="border-t border-borderLow pt-3">
+              <div className="text-label text-muted uppercase tracking-[0.05em] font-semibold mb-2">
+                Recent runs
+              </div>
+              <div className="space-y-1 max-h-52 overflow-y-auto font-mono text-small">
+                {data.recent.slice(0, 15).map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-muted">
+                    <span
+                      className={
+                        r.status === 'ok'
+                          ? 'text-green-400'
+                          : r.status === 'error'
+                            ? 'text-red-400'
+                            : 'text-gold'
+                      }
+                    >
+                      {r.status === 'ok' ? '✓' : r.status === 'error' ? '✕' : '…'}
+                    </span>
+                    <span className="text-mutedLow">{timeAgo(r.started_at)}</span>
+                    <span className="truncate">{r.scope}</span>
+                    {r.error && <span className="text-red-400/80 truncate">— {r.error}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-borderLow pt-3">
+            <div className="text-label text-muted uppercase tracking-[0.05em] font-semibold mb-2">
+              Backups {data.backups.length > 0 && `(${data.backups.length})`}
+            </div>
+            {data.backups.length === 0 ? (
+              <p className="text-small text-mutedLow">
+                None yet — a copy is written nightly at 04:23, or use the button above.
+              </p>
+            ) : (
+              <div className="space-y-1 font-mono text-small text-muted">
+                {data.backups.slice(0, 5).map((b) => (
+                  <div key={b.file} className="flex justify-between gap-3">
+                    <span className="truncate">{b.file}</span>
+                    <span className="text-mutedLow shrink-0">
+                      {(b.bytes / 1_000_000).toFixed(1)} MB · {timeAgo(b.modified)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

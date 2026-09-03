@@ -146,6 +146,29 @@ export const changeAdminPassword = (current: string, next: string) =>
     body: JSON.stringify({ current, next }),
   })
 
+export interface SyncOverview {
+  scheduler: { running: boolean; lastRun: number; lastError: string | null }
+  leagues: LeagueSyncStatus[]
+  recent: Array<{
+    league_id: string | null
+    scope: string
+    status: string | null
+    started_at: number | null
+    finished_at: number | null
+    error: string | null
+    records_written: number | null
+  }>
+  backups: Array<{ file: string; bytes: number; modified: number }>
+}
+
+export const getSyncOverview = () => hubFetch<SyncOverview>('/admin/sync')
+
+export const runSyncNow = () =>
+  hubFetch<{ started: boolean }>('/admin/sync/run', { method: 'POST' })
+
+export const runBackupNow = () =>
+  hubFetch<{ ok: boolean; file: string }>('/admin/sync/backup', { method: 'POST' })
+
 // ── Leagues ─────────────────────────────────────────────────────────────────
 
 export interface HubLeague {
@@ -187,6 +210,8 @@ export interface LeagueMeta {
   theme: { accent: string } | null
   ingested: boolean
   latestCapabilities: LeagueCapabilities | null
+  /** epoch ms of the last successful sync for this family, or null. */
+  lastSyncAt: number | null
   seasons: SeasonSummary[]
 }
 
@@ -333,3 +358,59 @@ export interface ManagerProfile {
 
 export const getManagerProfile = (slug: string, userId: string) =>
   hubFetch<ManagerProfile>(`/leagues/${slug}/managers/${userId}`)
+
+// ── Trades (dynasty §13) ────────────────────────────────────────────────────
+
+export interface TradeAssetView {
+  type: 'player' | 'pick' | 'faab'
+  playerId: string | null
+  label: string
+  position: string | null
+  fromUserId: string | null
+  toUserId: string | null
+  pointsRostered: number
+  pointsStarted: number
+  par: number
+  weeksRostered: number
+  weeksStarted: number
+  stillRostered: boolean
+  resolvedPlayerId?: string | null
+  resolutionStatus?: 'resolved' | 'pending' | 'unresolved'
+}
+
+export interface TradeSideView {
+  userId: string
+  name: string
+  received: TradeAssetView[]
+  totals: {
+    pointsRostered: number
+    pointsStarted: number
+    par: number
+    assetsReceived: number
+    assetsStillRostered: number
+  }
+}
+
+export interface TradeView {
+  id: string
+  season: number
+  week: number | null
+  date: number | null
+  isOffseason: boolean
+  teamCount: number
+  sides: TradeSideView[]
+  netStartedDiff: number
+  headline: string
+  weeksElapsed: number
+}
+
+export const getTrades = (slug: string, opts: { season?: number; userId?: string } = {}) => {
+  const qs = new URLSearchParams()
+  if (opts.season != null) qs.set('season', String(opts.season))
+  if (opts.userId) qs.set('userId', opts.userId)
+  const q = qs.toString()
+  return hubFetch<TradeView[]>(`/leagues/${slug}/trades${q ? `?${q}` : ''}`)
+}
+
+export const getTrade = (slug: string, tradeId: string) =>
+  hubFetch<TradeView>(`/leagues/${slug}/trades/${tradeId}`)

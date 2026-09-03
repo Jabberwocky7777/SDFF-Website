@@ -12,7 +12,9 @@ dist
 dist-ssr
 dist-server
 *.local
+*.tsbuildinfo
 cache/*.json
+cache-fresh/
 *.db
 *.db-shm
 *.db-wal

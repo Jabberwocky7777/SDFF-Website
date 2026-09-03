@@ -3,8 +3,12 @@
  * admin password. All routes require an admin session (mounted behind
  * requireAdmin in index.ts).
  */
+import fs from 'node:fs'
+import path from 'node:path'
 import { Router } from 'express'
-import { getDb } from '../db/index.js'
+import { cacheDir, getDb } from '../db/index.js'
+import { schedulerStatus, triggerIncremental } from '../sync/scheduler.js'
+import { runBackup } from '../sync/backup.js'
 import { getSleeperClient } from '../sleeper/client.js'
 import { walkLeagueChain } from '../sleeper/chain.js'
 import {
@@ -164,6 +168,54 @@ router.post('/admin/leagues/:slug/resync', (req, res) => {
   }
   const state = backfillLeague(req.params.slug, { force: req.body?.force === true })
   res.json({ state, sync: leagueSyncStatus(req.params.slug) })
+})
+
+// ── Sync & ops status ──────────────────────────────────────────────────────
+
+router.get('/admin/sync', (_req, res) => {
+  const db = getDb()
+  const recent = db
+    .prepare(
+      `SELECT league_id, scope, status, started_at, finished_at, error, records_written
+       FROM sync_log ORDER BY id DESC LIMIT 40`,
+    )
+    .all()
+
+  let backups: Array<{ file: string; bytes: number; modified: number }> = []
+  try {
+    const dir = path.join(cacheDir(), 'backups')
+    backups = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.db'))
+      .map((f) => {
+        const st = fs.statSync(path.join(dir, f))
+        return { file: f, bytes: st.size, modified: st.mtimeMs }
+      })
+      .sort((a, b) => b.modified - a.modified)
+  } catch {
+    /* no backups dir yet */
+  }
+
+  res.json({
+    scheduler: schedulerStatus(),
+    leagues: allLeagueSyncStatus(),
+    recent,
+    backups,
+  })
+})
+
+router.post('/admin/sync/run', (_req, res) => {
+  triggerIncremental()
+  res.json({ started: true })
+})
+
+router.post('/admin/sync/backup', (_req, res) => {
+  const file = runBackup()
+  if (!file) {
+    res.status(500).json({ error: 'backup failed — see server logs' })
+    return
+  }
+  res.json({ ok: true, file: path.basename(file) })
 })
 
 // ── Settings ───────────────────────────────────────────────────────────────

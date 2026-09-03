@@ -1,12 +1,16 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import NavBar from './NavBar'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 export default function RootLayout() {
+  const location = useLocation()
   return (
     <div className="min-h-screen bg-background text-text flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 pt-28 pb-16">
-        <Outlet />
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <footer className="border-t border-borderLow py-6">
         <div className="max-w-6xl mx-auto px-6">
