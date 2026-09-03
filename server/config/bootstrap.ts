@@ -7,11 +7,16 @@
  */
 import type { DB } from '../db/index.js'
 import { addLeague, getLeagues } from './leagues.js'
-import { isSetupComplete, setAdminPassword, setSleeperUsername } from '../auth/admin.js'
+import {
+  MIN_PASSWORD_LENGTH,
+  isSetupComplete,
+  setAdminPassword,
+  setSleeperUsername,
+} from '../auth/admin.js'
 import { setManagerAlias } from '../sync/upsert.js'
 import { readLegacyConfig } from './legacyImport.js'
 
-export function bootstrapLeaguesIfEmpty(db: DB): void {
+export async function bootstrapLeaguesIfEmpty(db: DB): Promise<void> {
   if (getLeagues(db).length > 0) return
 
   const legacy = readLegacyConfig()
@@ -44,12 +49,13 @@ export function bootstrapLeaguesIfEmpty(db: DB): void {
   if (legacy.sleeperUsername) setSleeperUsername(db, legacy.sleeperUsername)
 
   if (legacy.adminCode && !isSetupComplete(db)) {
-    if (legacy.adminCode.length >= 6) {
-      setAdminPassword(db, legacy.adminCode)
+    if (legacy.adminCode.length >= MIN_PASSWORD_LENGTH) {
+      await setAdminPassword(db, legacy.adminCode)
       console.log('[import] admin password set from the legacy adminCode')
     } else {
       console.warn(
-        '[import] legacy adminCode is shorter than 6 chars — set a new admin password in the app',
+        `[import] legacy adminCode is shorter than ${MIN_PASSWORD_LENGTH} chars — ` +
+          'set a new admin password in the app',
       )
     }
   }

@@ -254,25 +254,32 @@ function assertCodeUsable(db: DB, code: string, ignoreId?: number): void {
  * Resolve a login code: the admin password unlocks everything; a league's
  * access code unlocks that league.
  */
-export function resolveAccessCode(code: string): { admin: boolean; slugs: string[] } {
+export async function resolveAccessCode(
+  code: string,
+): Promise<{ admin: boolean; slugs: string[] }> {
   const db = getDb()
   const trimmed = code.trim()
   if (!trimmed) return { admin: false, slugs: [] }
 
-  if (verifyAdminPassword(db, trimmed)) {
+  if (await verifyAdminPassword(db, trimmed)) {
     return { admin: true, slugs: getLeagues(db).map((l) => l.slug) }
   }
 
   const upper = trimmed.toUpperCase()
   const slugs = getLeagues(db)
-    .filter((l) => timingSafeEqual(l.accessCode, upper))
+    .filter((l) => constantTimeEqual(l.accessCode, upper))
     .map((l) => l.slug)
   return { admin: false, slugs }
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let mismatch = 0
-  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return mismatch === 0
+/**
+ * Compares without leaking the code's length through an early return, which a
+ * plain `a === b` (or a length check before the loop) would. Hashing first
+ * gives both sides a fixed width so crypto.timingSafeEqual can be used as
+ * intended rather than reimplemented.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  const ha = crypto.createHash('sha256').update(a).digest()
+  const hb = crypto.createHash('sha256').update(b).digest()
+  return crypto.timingSafeEqual(ha, hb)
 }

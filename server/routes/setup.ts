@@ -18,7 +18,7 @@ router.get('/setup/status', (_req, res) => {
   })
 })
 
-router.post('/setup', (req, res) => {
+router.post('/setup', async (req, res) => {
   const db = getDb()
   if (isSetupComplete(db)) {
     res.status(409).json({ error: 'already set up' })
@@ -26,7 +26,7 @@ router.post('/setup', (req, res) => {
   }
   const password = typeof req.body?.password === 'string' ? req.body.password : ''
   try {
-    setAdminPassword(db, password)
+    await setAdminPassword(db, password)
   } catch (err) {
     res.status(400).json({ error: (err as Error).message })
     return

@@ -56,7 +56,7 @@ setInterval(() => {
   }
 }, WINDOW_MS).unref()
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
   const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown'
   if (rateLimited(ip)) {
     res
@@ -66,7 +66,7 @@ router.post('/auth/login', (req, res) => {
   }
 
   const code = typeof req.body?.code === 'string' ? req.body.code : ''
-  const { admin, slugs } = resolveAccessCode(code)
+  const { admin, slugs } = await resolveAccessCode(code)
   if (!admin && slugs.length === 0) {
     res.status(401).json({ error: "That code didn't match a league or the commissioner password." })
     return

@@ -8,7 +8,9 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { cacheDir } from '../db/index.js'
+import { cacheDir, getDb } from '../db/index.js'
+import { getSessionVersion } from './admin.js'
+import { log } from '../log.js'
 
 export const SESSION_COOKIE = 'sdff_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -19,6 +21,14 @@ export interface SessionPayload {
   admin: boolean
   /** issued-at, epoch ms */
   iat: number
+  /**
+   * Session-version stamp. Tokens are stateless, so this counter is the only
+   * way to revoke one before it expires: bumping the stored version (on a
+   * password change, or a deliberate sign-out-everywhere) orphans every cookie
+   * carrying an older number. Absent on tokens issued before this existed,
+   * which read as 0 so an upgrade doesn't sign everyone out.
+   */
+  v?: number
 }
 
 let cachedSecret: string | null = null
@@ -49,9 +59,11 @@ function getSecret(): string {
   try {
     fs.mkdirSync(cacheDir(), { recursive: true })
     fs.writeFileSync(secretFile, cachedSecret, { mode: 0o600 })
-    console.log('[auth] generated a new session secret at', secretFile)
+    log.info('generated a new session secret', { file: secretFile })
   } catch (err) {
-    console.warn('[auth] could not persist session secret — sessions reset on restart:', err)
+    log.warn('could not persist session secret — sessions reset on restart', {
+      err: (err as Error).message,
+    })
   }
   return cachedSecret
 }
@@ -64,8 +76,12 @@ function hmac(data: string): string {
   return crypto.createHmac('sha256', getSecret()).update(data).digest('base64url')
 }
 
-export function signSession(payload: Omit<SessionPayload, 'iat'>): string {
-  const full: SessionPayload = { ...payload, iat: Date.now() }
+export function signSession(payload: Omit<SessionPayload, 'iat' | 'v'>): string {
+  const full: SessionPayload = {
+    ...payload,
+    iat: Date.now(),
+    v: getSessionVersion(getDb()),
+  }
   const body = b64url(JSON.stringify(full))
   return `${body}.${hmac(body)}`
 }
@@ -101,6 +117,7 @@ export function verifySession(token: string | undefined | null): SessionPayload 
     return null
   }
   if (Date.now() - payload.iat > SESSION_TTL_MS) return null
+  if ((payload.v ?? 0) !== getSessionVersion(getDb())) return null
 
   return payload
 }

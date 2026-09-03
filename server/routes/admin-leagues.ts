@@ -230,21 +230,22 @@ router.put('/admin/settings', (req, res) => {
   res.json({ sleeperUsername: getSleeperUsername(getDb()) ?? '' })
 })
 
-router.post('/admin/password', (req, res) => {
+router.post('/admin/password', async (req, res) => {
   const db = getDb()
   const { current, next } = req.body as { current?: string; next?: string }
-  if (isSetupComplete(db) && !verifyAdminPassword(db, current ?? '')) {
+  if (isSetupComplete(db) && !(await verifyAdminPassword(db, current ?? ''))) {
     res.status(403).json({ error: 'current password is wrong' })
     return
   }
   try {
-    setAdminPassword(db, next ?? '')
+    await setAdminPassword(db, next ?? '')
   } catch (err) {
     res.status(400).json({ error: (err as Error).message })
     return
   }
-  // Refresh the caller's cookie so it stays valid after the key change is n/a
-  // (session isn't tied to the password), but re-issue anyway for good measure.
+  // setAdminPassword bumps the session version, so every outstanding cookie —
+  // including this caller's — is now stale. Re-issue theirs so changing the
+  // password doesn't sign the commissioner out of their own session.
   res.cookie(
     SESSION_COOKIE,
     signSession({ slugs: getLeagues(db).map((l) => l.slug), admin: true }),
