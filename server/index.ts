@@ -1,4 +1,4 @@
-import express from 'express'
+import express, { type NextFunction, type Request, type Response } from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -49,7 +49,10 @@ try {
   startScheduler()
   startBackupJob()
 } catch (err) {
-  dbError = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
+  // Message only — the diagnostic page below is served unauthenticated, and a
+  // stack trace there would hand out absolute paths and module layout. The full
+  // stack goes to the container log via fatal().
+  dbError = err instanceof Error ? err.message : String(err)
   fatal('database initialisation failed — starting in diagnostic mode', err)
 }
 
@@ -75,7 +78,8 @@ if (dbError) {
     `<pre style="background:#1A1C22;border:1px solid #333;padding:1rem;border-radius:8px;white-space:pre-wrap;overflow:auto">${msg
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')}</pre>` +
-    `<p>Fix the volume (TrueNAS: an <b>ixVolume</b> mounted at <code>/app/cache</code>, not read-only) and restart.</p>` +
+    `<p>Fix the volume (TrueNAS: an <b>ixVolume</b> mounted at <code>/app/cache</code>, not read-only) and restart. ` +
+    `The full error and stack trace are in the container log.</p>` +
     `</body>`
   app.get('/{*splat}', (req, res) => {
     res.status(req.path === '/' ? 200 : 503).type('html').send(page(dbError!))
@@ -120,6 +124,24 @@ if (dbError) {
   app.use('/api', announcementsRouter)
   app.use('/api', legacyGoneRouter)
   app.use('/api', adminRouter)
+
+  app.use('/api/{*splat}', (_req, res) => {
+    res.status(404).json({ error: 'not found' })
+  })
+
+  // Express 5 hides stack traces from responses when NODE_ENV=production, but
+  // that makes disclosure depend on an env var being set correctly. Be explicit:
+  // the client gets a generic 500, the detail goes to the log.
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+    log.error('unhandled route error', {
+      method: req.method,
+      path: req.originalUrl.split('?')[0],
+      err: err.message,
+      stack: err.stack,
+    })
+    if (res.headersSent) return
+    res.status(500).json({ error: 'internal server error' })
+  })
 
   const server = app.listen(PORT, () => {
     trace(`listening on :${PORT}`)
