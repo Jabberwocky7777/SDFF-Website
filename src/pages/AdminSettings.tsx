@@ -18,6 +18,7 @@ import {
   type AdminLeague,
 } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
+import { MIN_PASSWORD_LENGTH } from '@/config'
 
 const TYPES = ['dynasty', 'redraft', 'keeper', 'bestball'] as const
 
@@ -507,14 +508,14 @@ function SettingsSection() {
           type="password"
           value={pwNext}
           onChange={(e) => setPwNext(e.target.value)}
-          placeholder="New password (min 6)"
+          placeholder={`New password (min ${MIN_PASSWORD_LENGTH})`}
           autoComplete="new-password"
           className={inputCls}
         />
         {pwMsg && <p className="text-small text-muted">{pwMsg}</p>}
         <button
           onClick={() => changePw.mutate()}
-          disabled={changePw.isPending || pwNext.length < 6}
+          disabled={changePw.isPending || pwNext.length < MIN_PASSWORD_LENGTH}
           className="bg-gold text-background font-semibold text-small px-4 py-2 rounded-lg disabled:opacity-40"
         >
           {changePw.isPending ? 'Saving…' : 'Update password'}

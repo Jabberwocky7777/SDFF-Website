@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import PasswordInput from '@/components/ui/PasswordInput'
+import { MIN_PASSWORD_LENGTH } from '@/config'
 
 export default function SetupScreen() {
   const { setup } = useAuth()
@@ -11,7 +12,9 @@ export default function SetupScreen() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (pw.length < 6) return setError('Use at least 6 characters.')
+    if (pw.length < MIN_PASSWORD_LENGTH) {
+      return setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`)
+    }
     if (pw !== confirm) return setError('Passwords don’t match.')
     setLoading(true)
     setError('')

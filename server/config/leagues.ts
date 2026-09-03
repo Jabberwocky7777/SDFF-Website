@@ -128,6 +128,13 @@ function uniqueSlug(db: DB, base: string, ignoreId?: number): string {
   return `${base}-${Date.now()}`
 }
 
+/**
+ * Length of a generated access code. Eight characters of the 31-letter
+ * alphabet is ~8.5e11 combinations; four was ~9.2e5, which is guessable in
+ * hours if the login throttle is ever bypassed.
+ */
+const ACCESS_CODE_LENGTH = 8
+
 export function generateAccessCode(db: DB): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no ambiguous chars
   const existing = new Set(
@@ -137,10 +144,10 @@ export function generateAccessCode(db: DB): string {
   )
   for (let attempt = 0; attempt < 50; attempt++) {
     let code = ''
-    for (let i = 0; i < 4; i++) code += alphabet[crypto.randomInt(alphabet.length)]
+    for (let i = 0; i < ACCESS_CODE_LENGTH; i++) code += alphabet[crypto.randomInt(alphabet.length)]
     if (!existing.has(code)) return code
   }
-  return crypto.randomBytes(3).toString('hex').toUpperCase()
+  return crypto.randomBytes(6).toString('hex').toUpperCase()
 }
 
 export interface AddLeagueInput {

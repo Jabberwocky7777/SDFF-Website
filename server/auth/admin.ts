@@ -18,8 +18,13 @@ function hash(password: string, salt: string): string {
   return crypto.scryptSync(password, salt, 64).toString('hex')
 }
 
+/** Minimum commissioner password length. Also enforced in the setup UI. */
+export const MIN_PASSWORD_LENGTH = 12
+
 export function setAdminPassword(db: DB, password: string): void {
-  if (password.length < 6) throw new Error('Admin password must be at least 6 characters.')
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Admin password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+  }
   const salt = crypto.randomBytes(16).toString('hex')
   setKv(db, KEY_PW, `${salt}:${hash(password, salt)}`)
   if (!getKv(db, KEY_SETUP_AT)) setKv(db, KEY_SETUP_AT, String(Date.now()))

@@ -61,7 +61,9 @@ try {
 }
 
 const app = express()
-app.set('trust proxy', true)
+// One hop only. `true` would trust any X-Forwarded-For a client sends, which
+// lets anyone rotate their apparent IP past the login rate limiter.
+app.set('trust proxy', 1)
 
 app.get('/health', (_req, res) => {
   res.json({ status: dbError ? 'degraded' : 'ok' })

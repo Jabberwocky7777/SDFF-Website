@@ -20,9 +20,12 @@ import {
 
 const router = Router()
 
-// ── naive per-IP rate limit: 30 attempts / 10 min ──────────────────────────
-const WINDOW_MS = 10 * 60 * 1000
-const MAX_ATTEMPTS = 30
+// ── per-IP rate limit: 10 attempts / 15 min ────────────────────────────────
+// Access codes and the commissioner password are both short enough to brute
+// force at speed, so this is the only thing standing between the login form
+// and an offline-scale guessing run.
+const WINDOW_MS = 15 * 60 * 1000
+const MAX_ATTEMPTS = 10
 const attempts = new Map<string, number[]>()
 
 /** Records the attempt and returns true once the window is exceeded. */
