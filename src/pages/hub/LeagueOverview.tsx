@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
-import { getStandings } from '@/api/hub'
+import { getMatchupWeeks, getStandings, getWeekMatchups } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { Panel, Stat } from './shared'
 import { fmtRecord } from '@/lib/formatters'
@@ -11,6 +11,21 @@ export default function LeagueOverview() {
   const { data: allTime, isLoading } = useQuery({
     queryKey: ['hub', slug, 'standings', 'all'],
     queryFn: () => getStandings(slug),
+  })
+
+  // The most recent week on record — "this week" once a season is running,
+  // and the last game played otherwise. SDFF has none yet, hence the guards.
+  const weeks = useQuery({
+    queryKey: ['hub', slug, 'matchup-weeks'],
+    queryFn: () => getMatchupWeeks(slug),
+  })
+  const latestWeek = weeks.data?.[0]
+    ? { season: weeks.data[0].season, week: weeks.data[0].weeks[weeks.data[0].weeks.length - 1] }
+    : null
+  const recent = useQuery({
+    queryKey: ['hub', slug, 'matchups', latestWeek?.season, latestWeek?.week],
+    queryFn: () => getWeekMatchups(slug, latestWeek!.season, latestWeek!.week),
+    enabled: latestWeek != null,
   })
 
   const completed = meta.seasons.filter((s) => s.status === 'complete')
@@ -29,6 +44,41 @@ export default function LeagueOverview() {
           sub={latest?.status?.replace('_', ' ')}
         />
       </div>
+
+      {latestWeek && recent.data && recent.data.games.length > 0 && (
+        <Panel
+          title={`${latestWeek.season} · week ${latestWeek.week}`}
+          right={
+            <Link
+              to={`/l/${slug}/matchups`}
+              className="text-small text-muted hover:text-gold transition-colors"
+            >
+              All matchups →
+            </Link>
+          }
+        >
+          <div className="divide-y divide-borderLow">
+            {recent.data.games.slice(0, 6).map((g, i) => (
+              <div
+                key={g.matchupId ?? `solo-${g.home.rosterId}-${i}`}
+                className="flex items-center gap-3 px-5 py-2.5 text-small"
+              >
+                <span className="flex-1 truncate text-text">{g.home.name}</span>
+                <span className="font-mono text-num tabular text-muted w-16 text-right">
+                  {g.home.points.toFixed(1)}
+                </span>
+                <span className="text-mutedLow w-6 text-center">
+                  {g.away ? 'vs' : '—'}
+                </span>
+                <span className="font-mono text-num tabular text-muted w-16">
+                  {g.away ? g.away.points.toFixed(1) : ''}
+                </span>
+                <span className="flex-1 truncate text-text">{g.away?.name ?? 'Bye'}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
       {/* Champions strip */}

@@ -27,6 +27,7 @@ function tabsFor(meta: LeagueMeta): Tab[] {
     { to: '', label: 'Overview', end: true },
     { to: 'standings', label: 'Standings' },
     { to: 'history', label: 'History' },
+    { to: 'matchups', label: 'Matchups' },
     { to: 'head-to-head', label: 'Head-to-Head' },
     { to: 'records', label: 'Records' },
     { to: 'power-rankings', label: 'Power' },

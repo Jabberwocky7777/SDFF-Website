@@ -502,3 +502,45 @@ export const getDraftSeasons = (slug: string) =>
 
 export const getDraftBoard = (slug: string, season: number) =>
   hubFetch<DraftBoardView>(`/leagues/${slug}/drafts/${season}`)
+
+// ── Matchups ────────────────────────────────────────────────────────────────
+
+export interface MatchupSide {
+  userId: string | null
+  name: string
+  rosterId: number
+  teamName: string | null
+  points: number
+}
+
+export interface MatchupGame {
+  matchupId: number | null
+  home: MatchupSide
+  /** Null when a team had no opponent that week. */
+  away: MatchupSide | null
+  isPlayoff: boolean
+  isConsolation: boolean
+  /** No opponent that week — a playoff first-round bye, or an odd roster count. */
+  bye: boolean
+  final: boolean
+  /** The pair's all-time record, oriented home-vs-away. */
+  h2h: { wins: number; losses: number; ties: number; meetings: number } | null
+}
+
+export interface WeekView {
+  season: number
+  week: number
+  games: MatchupGame[]
+}
+
+export interface SeasonWeeks {
+  season: number
+  weeks: number[]
+  playoffWeekStart: number | null
+}
+
+export const getMatchupWeeks = (slug: string) =>
+  hubFetch<SeasonWeeks[]>(`/leagues/${slug}/matchups/weeks`)
+
+export const getWeekMatchups = (slug: string, season: number, week: number) =>
+  hubFetch<WeekView>(`/leagues/${slug}/matchups/${season}/${week}`)

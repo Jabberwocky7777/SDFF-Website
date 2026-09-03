@@ -37,6 +37,7 @@ import { getAllPlay } from '../analytics/allplay.js'
 import { getPowerRankings } from '../analytics/powerRankings.js'
 import { getTradeDetail, getTradeFeed } from '../analytics/trades.js'
 import { getDraftBoard, getDraftSeasons } from '../analytics/drafts.js'
+import { getMatchupWeeks, getWeekMatchups } from '../analytics/matchups.js'
 import { log } from '../log.js'
 
 const router = Router({ mergeParams: true })
@@ -115,6 +116,20 @@ router.get('/h2h', (req, res) => {
 
 router.get('/h2h/:userA/vs/:userB', (req, res) => {
   res.json(getH2HGameLog(getDb(), params(req).slug, params(req).userA, params(req).userB))
+})
+
+router.get('/matchups/weeks', (req, res) => {
+  res.json(getMatchupWeeks(getDb(), params(req).slug))
+})
+
+router.get('/matchups/:season/:week', (req, res) => {
+  const season = Number(params(req).season)
+  const week = Number(params(req).week)
+  if (!Number.isInteger(season) || !Number.isInteger(week)) {
+    res.status(400).json({ error: 'season and week must be integers' })
+    return
+  }
+  res.json(getWeekMatchups(getDb(), params(req).slug, season, week))
 })
 
 router.get('/managers', (req, res) => {
