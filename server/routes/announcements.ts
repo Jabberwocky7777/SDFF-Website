@@ -1,13 +1,11 @@
 import { Router } from 'express'
-import fs from 'fs'
-import path from 'path'
-import { randomUUID } from 'crypto'
+import { randomUUID } from 'node:crypto'
 import { requireAdmin } from '../auth/middleware.js'
-import { cacheDir } from '../db/index.js'
+import { readJsonFile, writeJsonFile } from '../lib/jsonFile.js'
 
 const router = Router()
 
-const FILE = () => path.join(cacheDir(), 'announcements.json')
+const FILE = 'announcements.json'
 
 interface Announcement {
   id: string
@@ -17,25 +15,9 @@ interface Announcement {
   pinned?: boolean
 }
 
-function readAnnouncements(): Announcement[] {
-  try {
-    const raw = fs.readFileSync(FILE(), 'utf8')
-    return JSON.parse(raw) as Announcement[]
-  } catch {
-    return []
-  }
-}
+const readAnnouncements = (): Announcement[] => readJsonFile<Announcement[]>(FILE, [])
 
-function writeAnnouncements(list: Announcement[]): void {
-  const f = FILE(); const tmp = f + '.tmp'
-  try {
-    fs.mkdirSync(cacheDir(), { recursive: true })
-    fs.writeFileSync(tmp, JSON.stringify(list, null, 2))
-    fs.renameSync(tmp, f)
-  } catch (err) {
-    console.error('[announcements] write error:', err)
-  }
-}
+const writeAnnouncements = (list: Announcement[]): void => writeJsonFile(FILE, list)
 
 function sorted(list: Announcement[]): Announcement[] {
   return [...list].sort((a, b) => {

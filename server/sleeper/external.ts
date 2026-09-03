@@ -8,7 +8,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { cacheDir } from '../db/index.js'
+import { readCacheFile, writeCacheFile } from '../lib/jsonFile.js'
 
 const KTC_PAGE_URL = 'https://keeptradecut.com/dynasty-rankings'
 
@@ -47,16 +47,12 @@ export async function fetchKtcHtmlRankings(): Promise<unknown> {
     .filter((p) => p.overallRank != null)
 }
 
-const FLOCK_FILE = () => path.join(cacheDir(), 'flock-rankings.csv')
+const FLOCK_FILE = 'flock-rankings.csv'
 const FLOCK_DEFAULT = path.join(process.cwd(), 'server', 'data', 'flock-rankings-default.csv')
 
 /** User-uploaded CSV if present, otherwise the bundled default. */
 export function readFlockCsv(): string {
-  try {
-    return fs.readFileSync(FLOCK_FILE(), 'utf8')
-  } catch {
-    return fs.readFileSync(FLOCK_DEFAULT, 'utf8')
-  }
+  return readCacheFile(FLOCK_FILE) ?? fs.readFileSync(FLOCK_DEFAULT, 'utf8')
 }
 
 /** Validate + atomically persist an uploaded Flock CSV. Returns the row count. */
@@ -76,10 +72,6 @@ export function writeFlockCsv(body: string): number {
   if (dataRows.length < 10) {
     throw new Error(`CSV must contain at least 10 data rows (found ${dataRows.length}).`)
   }
-  fs.mkdirSync(cacheDir(), { recursive: true })
-  const ff = FLOCK_FILE()
-  const tmp = ff + '.tmp'
-  fs.writeFileSync(tmp, body, 'utf8')
-  fs.renameSync(tmp, ff)
+  writeCacheFile(FLOCK_FILE, body)
   return dataRows.length
 }

@@ -74,9 +74,18 @@ describe('cache key validation', () => {
     }
   })
 
-  it('expires entries past their TTL but still serves them as stale', () => {
+  it('expires entries past their TTL but still serves them as stale', async () => {
     writeCache('ttl_probe', { v: 1 })
+    expect(readCache('ttl_probe', 60)).toEqual({ v: 1 })
+    // Sleep so the entry is measurably older than a zero-second TTL; without it
+    // the write and read can land in the same millisecond.
+    await new Promise((resolve) => setTimeout(resolve, 5))
     expect(readCache('ttl_probe', 0)).toBeNull()
     expect(readStale('ttl_probe')).toEqual({ v: 1 })
+  })
+
+  it('reports a miss for a key that was never written', () => {
+    expect(readCache('never_written', 60)).toBeNull()
+    expect(readStale('never_written')).toBeNull()
   })
 })
