@@ -9,11 +9,16 @@ lerna-debug.log*
 
 node_modules
 dist
-dist-ssr
 dist-server
 *.local
 *.tsbuildinfo
-cache/*.json
+coverage
+*.tgz
+
+# Runtime data dir: SQLite DB, JSON cache and the generated session key.
+# Nothing in here belongs in git — only the directory itself.
+cache/*
+!cache/.gitkeep
 cache-fresh/
 *.db
 *.db-shm
@@ -24,19 +29,19 @@ cache-fresh/
 # Real league config — contains access codes; mounted as a volume in prod
 config/leagues.json
 
-# Stray temp files with malformed names (from earlier tooling misfires)
-C*AppDataLocalTemp*
-*espn.json
-fp_qb.html
-
 # Claude Code internal
 .claude/
+
+# Pre-publication audit notes — not part of the project
+audit/
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+desktop.ini
 *.suo
 *.ntvs*
 *.njsproj
