@@ -1,25 +1,15 @@
-# TrueNAS Scale: Apps -> Discover Apps -> Custom App -> "Install via YAML",
-# paste this file, Save. Then open the app in your browser to finish setup —
-# create a commissioner password and add your leagues from Settings. Nothing
-# else to configure here.
+# For a hand-run "docker compose". On TrueNAS Scale, use the Custom App form
+# instead (see README) — you don't need this file there.
 services:
   sdff-web:
     image: ghcr.io/jabberwocky7777/sdff-website:latest
     ports:
-      - "7780:3001"          # host:container — change 7780 to suit your reverse proxy
+      - "7780:3001"
     environment:
-      TZ: America/New_York    # affects the sync scheduler's game-day windows
+      TZ: America/New_York
     volumes:
-      # SQLite history DB, cache, session key and admin-entered data.
-      # TrueNAS creates and manages this volume — nothing to set up.
       - sdff-data:/app/cache
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
 volumes:
-  sdff-data:
+  sdff-data: {}

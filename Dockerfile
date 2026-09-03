@@ -23,9 +23,13 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/server/data ./server/data
 COPY --from=builder /app/config/leagues.example.json ./config/leagues.example.json
-RUN mkdir -p /app/cache && chown -R node:node /app/cache
-USER node
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /app/cache && chmod 777 /app/cache
+
+# Run as root. Self-hosted app behind a login; this avoids the #1 deploy failure
+# on NAS platforms (a fresh persistent volume the non-root user can't write to).
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist-server/index.js"]
