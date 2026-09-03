@@ -30,6 +30,7 @@ export default function LeagueOverview() {
         />
       </div>
 
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
       {/* Champions strip */}
       {completed.length > 0 && (
         <Panel title="Champions">
@@ -83,6 +84,7 @@ export default function LeagueOverview() {
           </div>
         )}
       </Panel>
+      </div>
     </div>
   )
 }

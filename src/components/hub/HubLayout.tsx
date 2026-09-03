@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { NavLink, Navigate, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getLeagueMeta, type LeagueMeta } from '@/api/hub'
 import { useLeagues } from '@/context/LeaguesContext'
@@ -9,6 +9,7 @@ import LeagueSwitcher from './LeagueSwitcher'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { FreshnessNote } from './FreshnessNote'
+import HubTabs, { type Tab } from './HubTabs'
 
 export interface HubContext {
   slug: string
@@ -17,12 +18,6 @@ export interface HubContext {
 
 export function useHub(): HubContext {
   return useOutletContext<HubContext>()
-}
-
-interface Tab {
-  to: string
-  label: string
-  end?: boolean
 }
 
 /** Sub-nav is capability-aware: everyone gets the analytics + roster/draft tabs;
@@ -104,24 +99,7 @@ export default function HubLayout() {
         <LeagueSwitcher currentSlug={slug} />
       </div>
 
-      <div className="-mx-6 px-6 mb-8 overflow-x-auto">
-        <div className="flex gap-1 bg-surfaceHi border border-borderLow rounded-lg p-1 w-max min-w-full sm:min-w-0 sm:w-fit">
-          {tabs.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to ? `/l/${slug}/${t.to}` : `/l/${slug}`}
-              end={t.end}
-              className={({ isActive }) =>
-                `px-3.5 py-2 text-small font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isActive ? 'bg-gold text-[#1A1100]' : 'text-muted hover:text-text'
-                }`
-              }
-            >
-              {t.label}
-            </NavLink>
-          ))}
-        </div>
-      </div>
+      <HubTabs tabs={tabs} slug={slug} />
 
       <LeagueScope slug={slug}>
         <ErrorBoundary resetKey={location.pathname}>

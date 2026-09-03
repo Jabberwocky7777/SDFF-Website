@@ -4,6 +4,7 @@ import { useHub } from '@/components/hub/HubLayout'
 import { getTimeline } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState, Panel } from './shared'
+import ScrollTable from './ScrollTable'
 
 function rankColor(rank: number | null, total: number): string {
   if (rank == null) return 'text-mutedLow'
@@ -30,15 +31,15 @@ export default function HubHistory() {
   return (
     <div className="space-y-8">
       <Panel title="Season-by-season finish">
-        <div className="overflow-x-auto">
+        <ScrollTable className="border-0 rounded-none bg-transparent" maxHeight="calc(100vh - 22rem)">
           <table className="w-full min-w-[560px] border-collapse">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-surface text-left text-label text-muted uppercase font-semibold px-4 py-3 z-10">
+                <th className="sticky left-0 top-0 bg-surface text-left text-label text-muted uppercase font-semibold px-4 py-3 z-30">
                   Manager
                 </th>
                 {data.seasons.map((yr) => (
-                  <th key={yr} className="text-center text-label text-muted font-semibold px-2 py-3 font-mono">
+                  <th key={yr} className="sticky top-0 z-20 bg-surface text-center text-label text-muted font-semibold px-2 py-3 font-mono">
                     {String(yr).slice(2)}
                   </th>
                 ))}
@@ -68,7 +69,7 @@ export default function HubHistory() {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
         <p className="px-4 py-3 text-small text-mutedLow border-t border-borderLow">
           Cell = final placement that season. <span className="text-gold">Gold</span> = champion.
         </p>

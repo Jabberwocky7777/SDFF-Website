@@ -28,7 +28,7 @@ export default function HubRecords() {
   return (
     <div>
       <p className="text-label text-muted uppercase tracking-[0.06em] font-semibold mb-4">{scope}</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {cards.map((r) => (
           <div key={r.label} className="bg-surface border border-borderLow rounded-lg p-4">
             <div className="text-label text-muted uppercase tracking-[0.05em] font-semibold mb-2">

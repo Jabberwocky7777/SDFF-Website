@@ -15,6 +15,10 @@ export default {
         border:     'rgba(224,181,68,0.18)',
         borderLow:  'rgba(244,239,226,0.08)',
       },
+      maxWidth: {
+        // The one page-width token. Header, main and footer all key off this.
+        shell: '96rem',
+      },
       fontFamily: {
         sans:  ['Inter', 'system-ui', 'sans-serif'],
         serif: ['"Playfair Display"', 'Georgia', 'serif'],

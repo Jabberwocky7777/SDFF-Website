@@ -22,3 +22,14 @@
   ::-webkit-scrollbar-thumb { background: rgba(224,181,68,0.35); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(224,181,68,0.6); }
 }
+
+@layer components {
+  /* Escape the shell's max-width so a wide table can use the whole viewport.
+     `100vw` includes the classic Windows scrollbar, so `main` clips the few
+     pixels of overhang — `clip` rather than `hidden` so it never becomes a
+     scroll container and `position: sticky` inside keeps working. */
+  .bleed {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+  }
+}

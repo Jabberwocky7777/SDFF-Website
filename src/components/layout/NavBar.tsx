@@ -22,7 +22,7 @@ export default function NavBar() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-sm border-b border-borderLow h-[72px]">
-        <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+        <div className="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 shrink-0">
             <img src="/logo.svg" alt="" className="h-9 w-9" />
             <div>

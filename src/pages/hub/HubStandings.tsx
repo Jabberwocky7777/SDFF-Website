@@ -5,6 +5,8 @@ import { useHub } from '@/components/hub/HubLayout'
 import { getStandings } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
+import ScrollTable from './ScrollTable'
+import SeasonPills from './SeasonPills'
 import { fmtRecord } from '@/lib/formatters'
 
 export default function HubStandings() {
@@ -20,23 +22,21 @@ export default function HubStandings() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <SeasonPill active={allTime} onClick={() => setSeason('all')}>All-time</SeasonPill>
-        {meta.seasons.map((s) => (
-          <SeasonPill key={s.season} active={season === s.season} onClick={() => setSeason(s.season)}>
-            {s.season}
-          </SeasonPill>
-        ))}
-      </div>
+      <SeasonPills
+        seasons={meta.seasons.map((s) => s.season)}
+        value={season}
+        onChange={setSeason}
+        allTimeLabel="All-time"
+        className="mb-6"
+      />
 
       {isLoading ? (
         <SkeletonLoader rows={10} />
       ) : !data || data.length === 0 ? (
         <EmptyState>No games recorded yet for this {allTime ? 'league' : 'season'}.</EmptyState>
       ) : (
-        <div className="bg-surface border border-borderLow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+        <ScrollTable>
+          <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="bg-surfaceHi border-b border-borderLow text-label text-muted uppercase tracking-[0.04em]">
                   <th className="text-left font-semibold px-4 py-3 w-8">#</th>
@@ -83,25 +83,9 @@ export default function HubStandings() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+          </table>
+        </ScrollTable>
       )}
     </div>
-  )
-}
-
-function SeasonPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 text-small font-semibold rounded-md border transition-colors ${
-        active
-          ? 'bg-gold text-[#1A1100] border-gold'
-          : 'bg-surface text-muted border-borderLow hover:text-text hover:border-border'
-      }`}
-    >
-      {children}
-    </button>
   )
 }
