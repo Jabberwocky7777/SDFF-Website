@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
-import { getTimeline } from '@/api/hub'
+import { getBracketSeasons, getSeasonBracket, getTimeline } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState, Panel } from './shared'
 import ScrollTable from './ScrollTable'
+import PlayoffBracket from './PlayoffBracket'
 
 function rankColor(rank: number | null, total: number): string {
   if (rank == null) return 'text-mutedLow'
@@ -19,6 +21,10 @@ export default function HubHistory() {
   const { data, isLoading } = useQuery({
     queryKey: ['hub', slug, 'timeline'],
     queryFn: () => getTimeline(slug),
+  })
+  const bracketSeasons = useQuery({
+    queryKey: ['hub', slug, 'bracket-seasons'],
+    queryFn: () => getBracketSeasons(slug),
   })
 
   if (isLoading) return <SkeletonLoader rows={8} />
@@ -78,28 +84,107 @@ export default function HubHistory() {
       <Panel title="Seasons">
         <div className="divide-y divide-borderLow">
           {meta.seasons.map((s) => (
-            <div key={s.leagueId} className="flex items-center gap-4 px-5 py-4">
-              <span className="font-mono text-numLg font-bold text-muted w-16">{s.season}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-base text-text">
-                  {s.champion ? (
-                    <>
-                      <span className="text-gold font-semibold">{s.champion.name}</span> def.{' '}
-                      <span className="text-muted">{s.runnerUp?.name ?? '—'}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted capitalize">{s.status?.replace('_', ' ') ?? 'pending'}</span>
-                  )}
-                </div>
-                <div className="text-small text-mutedLow mt-0.5">
-                  {s.totalRosters ?? '?'} teams
-                  {s.capabilities?.hasMedianScoring ? ' · median scoring' : ''}
-                </div>
-              </div>
-            </div>
+            <SeasonRow
+              key={s.leagueId}
+              slug={slug}
+              season={s.season}
+              champion={s.champion?.name ?? null}
+              runnerUp={s.runnerUp?.name ?? null}
+              status={s.status}
+              totalRosters={s.totalRosters}
+              medianScoring={!!s.capabilities?.hasMedianScoring}
+              hasBracket={bracketSeasons.data?.includes(s.season) ?? false}
+            />
           ))}
         </div>
       </Panel>
+    </div>
+  )
+}
+
+/**
+ * A season, expandable to its playoff bracket. Collapsed by default and
+ * fetched only on open — nine seasons of brackets up front would be a lot of
+ * requests for something most visits never look at.
+ */
+function SeasonRow({
+  slug,
+  season,
+  champion,
+  runnerUp,
+  status,
+  totalRosters,
+  medianScoring,
+  hasBracket,
+}: {
+  slug: string
+  season: number
+  champion: string | null
+  runnerUp: string | null
+  status: string | null
+  totalRosters: number | null
+  medianScoring: boolean
+  hasBracket: boolean
+}) {
+  const [open, setOpen] = useState(false)
+
+  const bracket = useQuery({
+    queryKey: ['hub', slug, 'bracket', season],
+    queryFn: () => getSeasonBracket(slug, season),
+    enabled: open && hasBracket,
+  })
+
+  const summary = (
+    <>
+      <span className="font-mono text-numLg font-bold text-muted w-16 shrink-0">{season}</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-base text-text">
+          {champion ? (
+            <>
+              <span className="text-gold font-semibold">{champion}</span> def.{' '}
+              <span className="text-muted">{runnerUp ?? '—'}</span>
+            </>
+          ) : (
+            <span className="text-muted capitalize">{status?.replace('_', ' ') ?? 'pending'}</span>
+          )}
+        </div>
+        <div className="text-small text-mutedLow mt-0.5">
+          {totalRosters ?? '?'} teams
+          {medianScoring ? ' · median scoring' : ''}
+        </div>
+      </div>
+    </>
+  )
+
+  if (!hasBracket) {
+    return <div className="flex items-center gap-4 px-5 py-4">{summary}</div>
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/3 transition-colors"
+      >
+        {summary}
+        <span className="text-small text-muted shrink-0">{open ? 'Hide' : 'Bracket'}</span>
+      </button>
+      {open && (
+        <div className="px-5 pb-5">
+          {bracket.isLoading ? (
+            <p className="text-small text-mutedLow">Loading bracket…</p>
+          ) : bracket.data ? (
+            <PlayoffBracket
+              winners={bracket.data.winners}
+              losers={bracket.data.losers}
+              slug={slug}
+            />
+          ) : (
+            <p className="text-small text-mutedLow">No bracket on record for {season}.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

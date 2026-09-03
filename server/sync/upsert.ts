@@ -331,6 +331,47 @@ export function replaceTradeAssets(
   for (const a of assets) stmt.run({ ...a, tradeId })
 }
 
+export interface BracketMatchRow {
+  leagueId: string
+  bracket: 'winners' | 'losers'
+  matchId: number
+  round: number
+  t1RosterId: number | null
+  t2RosterId: number | null
+  winnerRosterId: number | null
+  loserRosterId: number | null
+  placement: number | null
+  t1FromJson: string | null
+  t2FromJson: string | null
+}
+
+/**
+ * Replace one bracket wholesale. Sleeper rewrites a bracket in place as rounds
+ * resolve — slots fill in, matches gain winners — so upserting row by row would
+ * leave stale matches behind if a bracket ever shrank.
+ */
+export function replaceBracket(
+  db: DB,
+  leagueId: string,
+  bracket: 'winners' | 'losers',
+  rows: BracketMatchRow[],
+): void {
+  db.prepare(`DELETE FROM playoff_bracket WHERE league_id = ? AND bracket = ?`).run(
+    leagueId,
+    bracket,
+  )
+  const stmt = db.prepare(
+    `INSERT INTO playoff_bracket (
+       league_id, bracket, match_id, round, t1_roster_id, t2_roster_id,
+       winner_roster_id, loser_roster_id, placement, t1_from_json, t2_from_json
+     ) VALUES (
+       @leagueId, @bracket, @matchId, @round, @t1RosterId, @t2RosterId,
+       @winnerRosterId, @loserRosterId, @placement, @t1FromJson, @t2FromJson
+     )`,
+  )
+  for (const r of rows) stmt.run(r)
+}
+
 export interface DraftPickRow {
   draftId: string
   pickNo: number

@@ -38,6 +38,7 @@ import { getPowerRankings } from '../analytics/powerRankings.js'
 import { getTradeDetail, getTradeFeed } from '../analytics/trades.js'
 import { getDraftBoard, getDraftSeasons } from '../analytics/drafts.js'
 import { getMatchupWeeks, getWeekMatchups } from '../analytics/matchups.js'
+import { getBracketSeasons, getSeasonBracket } from '../analytics/brackets.js'
 import { log } from '../log.js'
 
 const router = Router({ mergeParams: true })
@@ -116,6 +117,24 @@ router.get('/h2h', (req, res) => {
 
 router.get('/h2h/:userA/vs/:userB', (req, res) => {
   res.json(getH2HGameLog(getDb(), params(req).slug, params(req).userA, params(req).userB))
+})
+
+router.get('/brackets', (req, res) => {
+  res.json(getBracketSeasons(getDb(), params(req).slug))
+})
+
+router.get('/brackets/:season', (req, res) => {
+  const season = Number(params(req).season)
+  if (!Number.isInteger(season)) {
+    res.status(400).json({ error: 'season must be an integer' })
+    return
+  }
+  const view = getSeasonBracket(getDb(), params(req).slug, season)
+  if (!view) {
+    res.status(404).json({ error: 'no bracket on record for that season' })
+    return
+  }
+  res.json(view)
 })
 
 router.get('/matchups/weeks', (req, res) => {

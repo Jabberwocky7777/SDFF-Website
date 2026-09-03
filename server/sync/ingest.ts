@@ -11,13 +11,14 @@ import type { SleeperClient } from '../sleeper/client.js'
 import type { LeagueRecord } from '../config/leagues.js'
 import { walkLeagueChain } from '../sleeper/chain.js'
 import { deriveCapabilities, type LeagueCapabilities } from './capabilities.js'
-import { deriveFinalRanks } from './brackets.js'
+import { asRosterId, deriveFinalRanks } from './brackets.js'
 import { classifyWeek, type QualityCandidate } from './dataQuality.js'
 import { syncFamilyScoring } from './playerStats.js'
 import {
   applyManagerAliases,
   finishSyncLog,
   getKv,
+  replaceBracket,
   replaceTradeAssets,
   resolveManager,
   setKv,
@@ -32,7 +33,7 @@ import {
   upsertTradedPick,
   upsertTransaction,
 } from './upsert.js'
-import type { TradeAssetRow } from './upsert.js'
+import type { BracketMatchRow, TradeAssetRow } from './upsert.js'
 import type {
   SleeperLeague,
   SleeperMatchup,
@@ -411,6 +412,31 @@ async function ingestSeason(
       if (typeof n === 'number' && Number.isInteger(n)) playoffRosterIds.add(n)
     }
   }
+
+  // Persist the brackets themselves. They were previously read for their side
+  // effects and discarded, which left no way to draw a bracket after the fact.
+  const bracketRows = (
+    matches: typeof winners,
+    bracket: 'winners' | 'losers',
+  ): BracketMatchRow[] =>
+    matches
+      .filter((m) => m.m != null && m.r != null)
+      .map((m) => ({
+        leagueId,
+        bracket,
+        matchId: m.m,
+        round: m.r,
+        t1RosterId: asRosterId(m.t1),
+        t2RosterId: asRosterId(m.t2),
+        winnerRosterId: asRosterId(m.w),
+        loserRosterId: asRosterId(m.l),
+        placement: m.p ?? null,
+        t1FromJson: m.t1_from ? JSON.stringify(m.t1_from) : null,
+        t2FromJson: m.t2_from ? JSON.stringify(m.t2_from) : null,
+      }))
+
+  replaceBracket(db, leagueId, 'winners', bracketRows(winners, 'winners'))
+  replaceBracket(db, leagueId, 'losers', bracketRows(losers, 'losers'))
 
   const totalRosters = league.total_rosters ?? rosters.length
   if (args.isComplete && (winners.length > 0 || losers.length > 0)) {

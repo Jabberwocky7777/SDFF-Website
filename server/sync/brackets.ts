@@ -12,7 +12,8 @@
  */
 import type { BracketMatch } from '../sleeper/schemas.js'
 
-function asRosterId(v: number | string | null | undefined): number | null {
+/** Sleeper reports bracket slots as numbers or numeric strings, or not at all. */
+export function asRosterId(v: number | string | null | undefined): number | null {
   if (v == null) return null
   const n = typeof v === 'string' ? Number(v) : v
   return Number.isInteger(n) ? n : null

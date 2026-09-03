@@ -544,3 +544,46 @@ export const getMatchupWeeks = (slug: string) =>
 
 export const getWeekMatchups = (slug: string, season: number, week: number) =>
   hubFetch<WeekView>(`/leagues/${slug}/matchups/${season}/${week}`)
+
+// ── Playoff brackets ────────────────────────────────────────────────────────
+
+export interface BracketTeam {
+  rosterId: number
+  userId: string | null
+  name: string
+  teamName: string | null
+  /** Regular-season finish, which is what the bracket seeds off. */
+  seed: number | null
+  points: number | null
+  won: boolean
+}
+
+export interface BracketMatchView {
+  matchId: number
+  round: number
+  week: number | null
+  t1: BracketTeam | null
+  t2: BracketTeam | null
+  /** The placement this match decides — 1 for the championship. */
+  placement: number | null
+  from: { t1: string | null; t2: string | null }
+}
+
+export interface BracketView {
+  bracket: 'winners' | 'losers'
+  rounds: Array<{ round: number; week: number | null; matches: BracketMatchView[] }>
+}
+
+export interface SeasonBracketView {
+  season: number
+  leagueId: string
+  playoffWeekStart: number | null
+  winners: BracketView
+  losers: BracketView
+}
+
+export const getBracketSeasons = (slug: string) =>
+  hubFetch<number[]>(`/leagues/${slug}/brackets`)
+
+export const getSeasonBracket = (slug: string, season: number) =>
+  hubFetch<SeasonBracketView>(`/leagues/${slug}/brackets/${season}`)
