@@ -8,6 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import Database from 'better-sqlite3'
 import { runMigrations } from './migrate.js'
+import { die } from '../fatal.js'
 
 export type DB = Database.Database
 
@@ -24,13 +25,12 @@ function assertWritable(dir: string): void {
     fs.writeFileSync(probe, 'ok')
     fs.unlinkSync(probe)
   } catch (err) {
-    console.error(
-      `\n[startup] FATAL: cannot write to ${dir} (uid ${process.getuid?.() ?? '?'}).\n` +
-        `  The app stores its SQLite database here and can't start without it.\n` +
-        `  TrueNAS: use an "ixVolume" for /app/cache (auto-created, writable), or a\n` +
-        `  Host Path on a dataset the app owns. Underlying error: ${(err as Error).message}\n`,
+    die(
+      `cannot write to ${dir} (uid ${process.getuid?.() ?? '?'}).\n` +
+        `The app stores its SQLite database here. On TrueNAS: the /app/cache volume\n` +
+        `must be an ixVolume (or a writable Host Path) and NOT read-only.`,
+      err,
     )
-    process.exit(1)
   }
 }
 
@@ -39,12 +39,21 @@ export function getDb(): DB {
 
   assertWritable(path.dirname(DB_PATH))
 
-  const conn = new Database(DB_PATH)
-  conn.pragma('journal_mode = WAL')
-  conn.pragma('foreign_keys = ON')
-  conn.pragma('busy_timeout = 5000')
+  let conn: DB
+  try {
+    conn = new Database(DB_PATH)
+    conn.pragma('journal_mode = WAL')
+    conn.pragma('foreign_keys = ON')
+    conn.pragma('busy_timeout = 5000')
+  } catch (err) {
+    die(`could not open the SQLite database at ${DB_PATH}`, err)
+  }
 
-  runMigrations(conn)
+  try {
+    runMigrations(conn)
+  } catch (err) {
+    die('database migration failed', err)
+  }
 
   db = conn
   return db

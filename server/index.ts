@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sleeperRouter from './routes/sleeper.js'
@@ -14,6 +15,7 @@ import { getLeagues, toPublicLeague } from './config/leagues.js'
 import { bootstrapLeaguesIfEmpty } from './config/bootstrap.js'
 import { maybeResetAdmin } from './auth/admin.js'
 import { getDb } from './db/index.js'
+import { die } from './fatal.js'
 import { startScheduler } from './sync/scheduler.js'
 import { autoBackfillIfNeeded } from './sync/autobackfill.js'
 import {
@@ -33,26 +35,26 @@ console.log(
 )
 
 // Surface anything that would otherwise kill the process silently.
-process.on('uncaughtException', (err) => {
-  console.error('[fatal] uncaughtException:', err)
-  process.exit(1)
-})
+process.on('uncaughtException', (err) => die('uncaughtException', err))
 process.on('unhandledRejection', (err) => {
-  console.error('[fatal] unhandledRejection:', err)
+  fatalLog('unhandledRejection', err)
 })
+function fatalLog(what: string, err: unknown): void {
+  fs.writeSync(2, `\n[error] ${what}: ${err instanceof Error ? err.stack : String(err)}\n`)
+}
 
-// Open the SQLite DB (runs migrations), migrate any legacy file/env config into
-// it, then start the sync scheduler.
+// Open the SQLite DB (runs migrations), migrate any legacy config into it, then
+// start the sync scheduler.
 try {
   const db = getDb()
+  console.log('[startup] db open + migrated')
   maybeResetAdmin(db)
   bootstrapLeaguesIfEmpty(db)
   const slugs = getLeagues(db).map((l) => l.slug)
-  console.log(`[startup] SQLite ready — leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
+  console.log(`[startup] ready — leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
   startScheduler()
 } catch (err) {
-  console.error('[startup] SQLite init failed:', err)
-  process.exit(1)
+  die('startup failed after opening the database', err)
 }
 
 const app = express()
@@ -132,8 +134,8 @@ app.use('/api', requireDefaultLeagueAccess, draftRouter)
 // Editable admin data (dues, championship history, squad pot)
 app.use('/api', adminRouter)
 
-app.listen(PORT, () => {
-  console.log(`SDFF server running on http://localhost:${PORT}`)
+const server = app.listen(PORT, () => {
+  console.log(`[startup] listening on :${PORT}`)
   if (IS_DEV) console.log('[dev] open the app to set up the admin password / add leagues')
 
   // First-run: self-populate history for any league not yet ingested. Deferred
@@ -146,3 +148,5 @@ app.listen(PORT, () => {
     }
   }, 8000)
 })
+
+server.on('error', (err) => die(`could not bind port ${PORT}`, err))
