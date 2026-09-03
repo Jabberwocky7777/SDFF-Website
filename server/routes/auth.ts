@@ -19,7 +19,6 @@ import {
 } from '../auth/session.js'
 
 const router = Router()
-const IS_PROD = process.env.NODE_ENV === 'production'
 
 // ── naive per-IP rate limit: 30 attempts / 10 min ──────────────────────────
 const WINDOW_MS = 10 * 60 * 1000
@@ -72,7 +71,7 @@ router.post('/auth/login', (req, res) => {
 
   clearAttempts(ip)
   const token = signSession({ slugs, admin })
-  res.cookie(SESSION_COOKIE, token, sessionCookieOptions(IS_PROD))
+  res.cookie(SESSION_COOKIE, token, sessionCookieOptions(req.secure))
   res.json({ authed: true, slugs, admin })
 })
 

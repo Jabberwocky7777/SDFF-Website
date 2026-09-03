@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import PasswordInput from '@/components/ui/PasswordInput'
 
 export default function SplashScreen() {
   const { login } = useAuth()
@@ -37,22 +38,16 @@ export default function SplashScreen() {
               <label className="block text-label text-muted uppercase font-sans mb-2 tracking-[0.06em]">
                 Access Code
               </label>
-              <input
-                type="text"
+              <PasswordInput
                 value={value}
-                onChange={(e) => {
-                  setValue(e.target.value)
+                onChange={(v) => {
+                  setValue(v)
                   setError('')
                 }}
                 placeholder="e.g. SDFF"
                 autoFocus
-                autoCapitalize="characters"
-                autoComplete="off"
-                className={`w-full bg-background border rounded-lg px-3 py-2.5 font-mono text-base tracking-[0.15em] text-text placeholder-muted/40 placeholder:tracking-normal placeholder:font-sans outline-none transition-colors ${
-                  error
-                    ? 'border-red-500/60 focus:border-red-400'
-                    : 'border-borderLow focus:border-border'
-                }`}
+                invalid={!!error}
+                mono
               />
               {error && <p className="mt-1.5 text-red-400 text-small font-sans">{error}</p>}
             </div>

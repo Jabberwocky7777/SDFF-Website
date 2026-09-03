@@ -9,7 +9,6 @@ import { getLeagues } from '../config/leagues.js'
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '../auth/session.js'
 
 const router = Router()
-const IS_PROD = process.env.NODE_ENV === 'production'
 
 router.get('/setup/status', (_req, res) => {
   const db = getDb()
@@ -33,7 +32,7 @@ router.post('/setup', (req, res) => {
     return
   }
   const slugs = getLeagues(db).map((l) => l.slug)
-  res.cookie(SESSION_COOKIE, signSession({ slugs, admin: true }), sessionCookieOptions(IS_PROD))
+  res.cookie(SESSION_COOKIE, signSession({ slugs, admin: true }), sessionCookieOptions(req.secure))
   res.json({ authed: true, admin: true, slugs })
 })
 

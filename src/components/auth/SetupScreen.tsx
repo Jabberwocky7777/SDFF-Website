@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import PasswordInput from '@/components/ui/PasswordInput'
 
 export default function SetupScreen() {
-  const { setup, hasLeagues } = useAuth()
+  const { setup } = useAuth()
   const [pw, setPw] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -41,31 +42,31 @@ export default function SetupScreen() {
               <label className="block text-label text-muted uppercase font-sans mb-2 tracking-[0.06em]">
                 Commissioner password
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 value={pw}
-                onChange={(e) => {
-                  setPw(e.target.value)
+                onChange={(v) => {
+                  setPw(v)
                   setError('')
                 }}
                 autoFocus
                 autoComplete="new-password"
-                className="w-full bg-background border border-borderLow focus:border-border rounded-lg px-3 py-2.5 font-sans text-base text-text outline-none transition-colors"
+                invalid={!!error}
+                aria-label="Commissioner password"
               />
             </div>
             <div>
               <label className="block text-label text-muted uppercase font-sans mb-2 tracking-[0.06em]">
                 Confirm
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 value={confirm}
-                onChange={(e) => {
-                  setConfirm(e.target.value)
+                onChange={(v) => {
+                  setConfirm(v)
                   setError('')
                 }}
                 autoComplete="new-password"
-                className="w-full bg-background border border-borderLow focus:border-border rounded-lg px-3 py-2.5 font-sans text-base text-text outline-none transition-colors"
+                invalid={!!error}
+                aria-label="Confirm password"
               />
             </div>
             {error && <p className="text-red-400 text-small font-sans">{error}</p>}
@@ -77,12 +78,10 @@ export default function SetupScreen() {
               {loading ? 'Setting up…' : 'Create'}
             </button>
           </form>
-          {!hasLeagues && (
-            <p className="mt-4 text-small text-mutedLow leading-relaxed">
-              Next you’ll add your Sleeper leagues — the app pulls each league’s full
-              history automatically.
-            </p>
-          )}
+          <p className="mt-4 text-small text-mutedLow leading-relaxed">
+            Next you’ll add your Sleeper leagues — the app pulls each league’s full
+            history automatically.
+          </p>
         </div>
       </div>
     </div>

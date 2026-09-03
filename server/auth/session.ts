@@ -105,7 +105,14 @@ export function verifySession(token: string | undefined | null): SessionPayload 
   return payload
 }
 
-export function sessionCookieOptions(isProd: boolean): {
+/**
+ * Cookie flags. `secure` MUST follow the actual request protocol, not
+ * NODE_ENV — a Secure cookie set over plain HTTP is silently dropped by the
+ * browser, which is exactly what happens on a NAS accessed by host:port with
+ * no HTTPS. Pass `req.secure` (Express respects X-Forwarded-Proto when
+ * `trust proxy` is set).
+ */
+export function sessionCookieOptions(secure: boolean): {
   httpOnly: true
   sameSite: 'lax'
   secure: boolean
@@ -115,7 +122,7 @@ export function sessionCookieOptions(isProd: boolean): {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: isProd,
+    secure,
     maxAge: SESSION_TTL_MS,
     path: '/',
   }

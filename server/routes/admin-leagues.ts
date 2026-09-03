@@ -33,7 +33,6 @@ import {
 } from '../auth/session.js'
 
 const router = Router()
-const IS_PROD = process.env.NODE_ENV === 'production'
 
 function isType(v: unknown): v is LeagueType {
   return typeof v === 'string' && (LEAGUE_TYPES as readonly string[]).includes(v)
@@ -197,7 +196,7 @@ router.post('/admin/password', (req, res) => {
   res.cookie(
     SESSION_COOKIE,
     signSession({ slugs: getLeagues(db).map((l) => l.slug), admin: true }),
-    sessionCookieOptions(IS_PROD),
+    sessionCookieOptions(req.secure),
   )
   res.json({ ok: true })
 })
