@@ -8,6 +8,7 @@
  */
 import type { SleeperClient } from './client.js'
 import type { SleeperLeague } from './schemas.js'
+import { log } from '../log.js'
 
 export interface LeagueChainEntry {
   leagueId: string
@@ -41,7 +42,7 @@ export async function walkLeagueChain(
 
   while (id && depth < MAX_DEPTH) {
     if (seen.has(id)) {
-      console.warn(`[chain] cycle detected at league ${id} — stopping walk`)
+      log.warn('league chain cycle detected — stopping walk', { leagueId: id })
       break
     }
     seen.add(id)
@@ -68,7 +69,7 @@ export async function walkLeagueChain(
   }
 
   if (depth >= MAX_DEPTH) {
-    console.warn(`[chain] hit MAX_DEPTH (${MAX_DEPTH}) walking from ${currentLeagueId}`)
+    log.warn('league chain hit max depth', { maxDepth: MAX_DEPTH, from: currentLeagueId })
   }
 
   entries.reverse() // oldest season first

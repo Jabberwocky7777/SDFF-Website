@@ -10,6 +10,7 @@ import express, { Router } from 'express'
 import { readCache, readStale, writeCache } from '../cache.js'
 import { serveCached, serveCachedUrl } from '../sleeper/proxy.js'
 import { fetchKtcHtmlRankings, readFlockCsv, writeFlockCsv } from '../sleeper/external.js'
+import { log } from '../log.js'
 
 const router = Router()
 
@@ -61,7 +62,7 @@ router.get('/ktc-rankings', (_req, res) => {
         res.setHeader('X-Cache-Stale', 'true')
         res.json(stale)
       } else {
-        console.error('[ktc]', err)
+        log.error('ktc rankings fetch failed', { err: (err as Error).message })
         res.status(502).json({ error: 'KTC unavailable and no cache found.' })
       }
     })
@@ -71,7 +72,7 @@ router.get('/flock-rankings', (_req, res) => {
   try {
     res.type('text/plain').send(readFlockCsv())
   } catch (err) {
-    console.error('[flock]', err)
+    log.error('flock rankings read failed', { err: (err as Error).message })
     res.status(500).json({ error: 'Flock rankings file not found.' })
   }
 })

@@ -11,6 +11,7 @@
 import { Router } from 'express'
 import { getLeagues, resolveAccessCode } from '../config/leagues.js'
 import { getDb, isEphemeralStorage } from '../db/index.js'
+import { log } from '../log.js'
 import { isSetupComplete } from '../auth/admin.js'
 import {
   SESSION_COOKIE,
@@ -35,7 +36,7 @@ function rateLimited(ip: string): boolean {
   hits.push(now)
   attempts.set(ip, hits)
   if (hits.length > MAX_ATTEMPTS) {
-    console.warn(`[auth] rate-limiting ${ip} (${hits.length} attempts in ${WINDOW_MS / 60000} min)`)
+    log.warn('login rate-limited', { ip, attempts: hits.length, windowMin: WINDOW_MS / 60000 })
     return true
   }
   return false

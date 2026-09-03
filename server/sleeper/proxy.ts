@@ -7,6 +7,7 @@
 import type { Response } from 'express'
 import { readCache, writeCache, readStale } from '../cache.js'
 import { getSleeperClient } from './client.js'
+import { log } from '../log.js'
 
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 
@@ -40,7 +41,7 @@ export async function serveCached(
       res.setHeader('X-Cache-Stale', 'true')
       res.json(stale)
     } else {
-      console.error('[sleeper proxy]', err)
+      log.error('sleeper proxy failed with no cache to fall back on', { err: (err as Error).message })
       res.status(502).json({ error: 'Sleeper API unavailable and no cache found.' })
     }
   }
@@ -79,7 +80,7 @@ export async function serveCachedUrl(
     } else if (opts.emptyOnError) {
       res.json([])
     } else {
-      console.error('[external proxy]', err)
+      log.error('external proxy failed with no cache to fall back on', { err: (err as Error).message })
       res.status(502).json({ error: 'Upstream API unavailable and no cache found.' })
     }
   }

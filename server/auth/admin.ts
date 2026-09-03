@@ -9,6 +9,7 @@ import crypto from 'node:crypto'
 import { promisify } from 'node:util'
 import type { DB } from '../db/index.js'
 import { getKv, setKv } from '../sync/upsert.js'
+import { log } from '../log.js'
 
 const KEY_PW = 'admin_pw'
 const KEY_USERNAME = 'sleeper_username'
@@ -92,9 +93,7 @@ export function maybeResetAdmin(db: DB): void {
   if (getKv(db, KEY_RESET_TOKEN) === token) return // already consumed this token
   db.prepare(`DELETE FROM kv WHERE key = ?`).run(KEY_PW)
   setKv(db, KEY_RESET_TOKEN, token)
-  console.warn(
-    `[admin] RESET_ADMIN=${token} — commissioner password cleared; open the app to set a new one`,
-  )
+  log.warn('RESET_ADMIN consumed — commissioner password cleared', { token })
 }
 
 export function getSleeperUsername(db: DB): string | null {
