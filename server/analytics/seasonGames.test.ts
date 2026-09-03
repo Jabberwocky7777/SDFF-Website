@@ -41,7 +41,7 @@ function seed(db: DB, season = 2025): void {
   let rank = 1
   for (let i = 0; i < 80; i++) insert.run(season, `backup${i}`, 10, rank++, (i % 8) + 1)
   for (let i = 0; i < 19; i++) insert.run(season, `starter${i}`, 200, rank++, 17)
-  insert.run(season, 'traded', 150, rank++, 18)
+  insert.run(season, 'traded', 150, rank, 18)
 }
 
 describe('getSeasonGames', () => {
