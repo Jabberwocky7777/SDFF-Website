@@ -16,10 +16,28 @@ const DB_PATH = process.env.DB_PATH ?? path.join(CACHE_DIR, 'sdff.db')
 
 let db: DB | null = null
 
+/** Fail loudly and clearly if the persistent data dir isn't usable. */
+function assertWritable(dir: string): void {
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+    const probe = path.join(dir, `.write-test-${process.pid}`)
+    fs.writeFileSync(probe, 'ok')
+    fs.unlinkSync(probe)
+  } catch (err) {
+    console.error(
+      `\n[startup] FATAL: cannot write to ${dir} (uid ${process.getuid?.() ?? '?'}).\n` +
+        `  The app stores its SQLite database here and can't start without it.\n` +
+        `  TrueNAS: use an "ixVolume" for /app/cache (auto-created, writable), or a\n` +
+        `  Host Path on a dataset the app owns. Underlying error: ${(err as Error).message}\n`,
+    )
+    process.exit(1)
+  }
+}
+
 export function getDb(): DB {
   if (db) return db
 
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
+  assertWritable(path.dirname(DB_PATH))
 
   const conn = new Database(DB_PATH)
   conn.pragma('journal_mode = WAL')

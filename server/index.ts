@@ -27,8 +27,22 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+console.log(
+  `[startup] SDFF hub — node ${process.version}, uid ${process.getuid?.() ?? '?'}, ` +
+    `cwd ${process.cwd()}, CACHE_DIR ${process.env.CACHE_DIR ?? '(default)'}`,
+)
+
+// Surface anything that would otherwise kill the process silently.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException:', err)
+  process.exit(1)
+})
+process.on('unhandledRejection', (err) => {
+  console.error('[fatal] unhandledRejection:', err)
+})
+
 // Open the SQLite DB (runs migrations), migrate any legacy file/env config into
-// it, then start the sync scheduler. A DB failure must not take down the proxy.
+// it, then start the sync scheduler.
 try {
   const db = getDb()
   maybeResetAdmin(db)
