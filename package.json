@@ -21,6 +21,7 @@
     "leagues:discover": "tsx server/scripts/discover-leagues.ts",
     "sync:backfill": "tsx server/scripts/sync-backfill.ts",
     "sync:incremental": "tsx server/scripts/sync-incremental.ts",
+    "trades:audit": "tsx server/scripts/audit-trades.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
