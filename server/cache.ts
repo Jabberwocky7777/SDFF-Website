@@ -1,15 +1,16 @@
 import fs from 'fs'
 import path from 'path'
-
-const CACHE_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
+import { cacheDir } from './db/index.js'
 
 interface CacheEnvelope {
   data: unknown
   cachedAt: number
 }
 
+const fileFor = (key: string) => path.join(cacheDir(), `${key}.json`)
+
 export function readCache(key: string, ttlSeconds: number): unknown | null {
-  const file = path.join(CACHE_DIR, `${key}.json`)
+  const file = fileFor(key)
   try {
     const raw = fs.readFileSync(file, 'utf8')
     const envelope = JSON.parse(raw) as CacheEnvelope
@@ -22,11 +23,11 @@ export function readCache(key: string, ttlSeconds: number): unknown | null {
 }
 
 export function writeCache(key: string, data: unknown): void {
-  const file = path.join(CACHE_DIR, `${key}.json`)
+  const file = fileFor(key)
   const tmp = file + '.tmp'
   const envelope: CacheEnvelope = { data, cachedAt: Date.now() }
   try {
-    fs.mkdirSync(CACHE_DIR, { recursive: true })
+    fs.mkdirSync(cacheDir(), { recursive: true })
     fs.writeFileSync(tmp, JSON.stringify(envelope))
     fs.renameSync(tmp, file)
   } catch (err) {
@@ -35,7 +36,7 @@ export function writeCache(key: string, data: unknown): void {
 }
 
 export function readStale(key: string): unknown | null {
-  const file = path.join(CACHE_DIR, `${key}.json`)
+  const file = fileFor(key)
   try {
     const raw = fs.readFileSync(file, 'utf8')
     const envelope = JSON.parse(raw) as CacheEnvelope

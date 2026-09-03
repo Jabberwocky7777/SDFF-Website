@@ -10,7 +10,7 @@
  */
 import { Router } from 'express'
 import { getLeagues, resolveAccessCode } from '../config/leagues.js'
-import { getDb } from '../db/index.js'
+import { getDb, isEphemeralStorage } from '../db/index.js'
 import { isSetupComplete } from '../auth/admin.js'
 import {
   SESSION_COOKIE,
@@ -76,6 +76,8 @@ router.get('/auth/session', (req, res) => {
     hasLeagues: leagues.length > 0,
     /** The lowest-sort-order league — its full dynasty pages are the "home" site. */
     flagshipSlug: leagues[0]?.slug ?? null,
+    /** true = the persistent volume failed, data will be lost on restart. */
+    ephemeralStorage: isEphemeralStorage(),
   }
   if (!req.auth) {
     res.json({ authed: false, slugs: [], admin: false, ...base })

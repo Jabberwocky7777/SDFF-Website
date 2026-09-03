@@ -8,9 +8,10 @@ const router = Router()
 // unless LEAGUE_ID is explicitly set. PLAN.md §3 backward-compat.
 // Resolved lazily (per request) so a missing config surfaces as the clean
 // startup error in index.ts rather than an import-time crash.
-let cachedLeagueId: string | undefined
 function LEAGUE_ID(): string {
-  return (cachedLeagueId ??= process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId)
+  const id = process.env.LEAGUE_ID || getLeagues()[0]?.currentLeagueId
+  if (!id) throw new Error('no leagues configured yet')
+  return id
 }
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
 

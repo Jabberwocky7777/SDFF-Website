@@ -29,6 +29,7 @@ export interface SessionInfo {
   needsSetup: boolean
   hasLeagues: boolean
   flagshipSlug: string | null
+  ephemeralStorage: boolean
 }
 
 export const getSession = () => hubFetch<SessionInfo>('/auth/session')

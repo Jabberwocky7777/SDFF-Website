@@ -3,19 +3,20 @@ import fs from 'fs'
 import path from 'path'
 import { readCache, writeCache, readStale } from '../cache.js'
 import { getLeagues } from '../config/leagues.js'
+import { cacheDir } from '../db/index.js'
 
 const router = Router()
 
-let cachedLeagueId: string | undefined
 function LEAGUE_ID(): string {
-  return (cachedLeagueId ??= process.env.LEAGUE_ID || getLeagues()[0].currentLeagueId)
+  const id = process.env.LEAGUE_ID || getLeagues()[0]?.currentLeagueId
+  if (!id) throw new Error('no leagues configured yet')
+  return id
 }
 const SLEEPER_BASE = 'https://api.sleeper.app/v1'
-const CACHE_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
 
 const KTC_PAGE_URL = 'https://keeptradecut.com/dynasty-rankings'
 const FC_URL  = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=2&ppr=1&isSuperflex=true&tep=1'
-const FLOCK_FILE = path.join(CACHE_DIR, 'flock-rankings.csv')
+const FLOCK_FILE = () => path.join(cacheDir(), 'flock-rankings.csv')
 const FLOCK_DEFAULT = path.join(process.cwd(), 'server', 'data', 'flock-rankings-default.csv')
 
 // In-memory cache for Flock CSV (avoids repeated disk reads during draft)
@@ -125,7 +126,7 @@ router.get('/flock-rankings', (_req, res) => {
   // Try user-uploaded file first, then fall back to bundled default
   let text: string
   try {
-    text = fs.readFileSync(FLOCK_FILE, 'utf8')
+    text = fs.readFileSync(FLOCK_FILE(), 'utf8')
   } catch {
     try {
       text = fs.readFileSync(FLOCK_DEFAULT, 'utf8')
@@ -177,10 +178,10 @@ router.post(
 
     // Atomic write to CACHE_DIR
     try {
-      fs.mkdirSync(CACHE_DIR, { recursive: true })
-      const tmp = FLOCK_FILE + '.tmp'
+      fs.mkdirSync(cacheDir(), { recursive: true })
+      const ff = FLOCK_FILE(); const tmp = ff + '.tmp'
       fs.writeFileSync(tmp, body, 'utf8')
-      fs.renameSync(tmp, FLOCK_FILE)
+      fs.renameSync(tmp, ff)
     } catch (err) {
       console.error('[draft] flock-rankings write error:', err)
       res.status(500).json({ error: 'Failed to save rankings file.' })

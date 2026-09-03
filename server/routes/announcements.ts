@@ -3,11 +3,11 @@ import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { requireAdmin } from '../auth/middleware.js'
+import { cacheDir } from '../db/index.js'
 
 const router = Router()
 
-const DATA_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
-const FILE = path.join(DATA_DIR, 'announcements.json')
+const FILE = () => path.join(cacheDir(), 'announcements.json')
 
 interface Announcement {
   id: string
@@ -19,7 +19,7 @@ interface Announcement {
 
 function readAnnouncements(): Announcement[] {
   try {
-    const raw = fs.readFileSync(FILE, 'utf8')
+    const raw = fs.readFileSync(FILE(), 'utf8')
     return JSON.parse(raw) as Announcement[]
   } catch {
     return []
@@ -27,11 +27,11 @@ function readAnnouncements(): Announcement[] {
 }
 
 function writeAnnouncements(list: Announcement[]): void {
-  const tmp = FILE + '.tmp'
+  const f = FILE(); const tmp = f + '.tmp'
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true })
+    fs.mkdirSync(cacheDir(), { recursive: true })
     fs.writeFileSync(tmp, JSON.stringify(list, null, 2))
-    fs.renameSync(tmp, FILE)
+    fs.renameSync(tmp, f)
   } catch (err) {
     console.error('[announcements] write error:', err)
   }

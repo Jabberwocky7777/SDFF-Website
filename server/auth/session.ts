@@ -8,6 +8,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { cacheDir } from '../db/index.js'
 
 export const SESSION_COOKIE = 'sdff_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -36,8 +37,7 @@ function getSecret(): string {
     return cachedSecret
   }
 
-  const cacheDir = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
-  const secretFile = path.join(cacheDir, '.session-secret')
+  const secretFile = path.join(cacheDir(), '.session-secret')
   try {
     cachedSecret = fs.readFileSync(secretFile, 'utf8').trim()
     if (cachedSecret.length >= 16) return cachedSecret
@@ -47,7 +47,7 @@ function getSecret(): string {
 
   cachedSecret = crypto.randomBytes(32).toString('hex')
   try {
-    fs.mkdirSync(cacheDir, { recursive: true })
+    fs.mkdirSync(cacheDir(), { recursive: true })
     fs.writeFileSync(secretFile, cachedSecret, { mode: 0o600 })
     console.log('[auth] generated a new session secret at', secretFile)
   } catch (err) {

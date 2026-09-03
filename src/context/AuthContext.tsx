@@ -13,6 +13,8 @@ interface AuthContextValue {
   needsSetup: boolean
   hasLeagues: boolean
   flagshipSlug: string | null
+  /** true = the server's storage volume failed; data resets on restart. */
+  ephemeralStorage: boolean
   /** League slugs this session may view. */
   slugs: string[]
   admin: boolean
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [hasLeagues, setHasLeagues] = useState(false)
   const [flagshipSlug, setFlagshipSlug] = useState<string | null>(null)
+  const [ephemeralStorage, setEphemeralStorage] = useState(false)
   const [checking, setChecking] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -54,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNeedsSetup(!!s.needsSetup)
       setHasLeagues(!!s.hasLeagues)
       setFlagshipSlug(s.flagshipSlug ?? null)
+      setEphemeralStorage(!!s.ephemeralStorage)
     } catch {
       setAuthed(false)
       setSlugs([])
@@ -126,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         needsSetup,
         hasLeagues,
         flagshipSlug,
+        ephemeralStorage,
         slugs,
         admin,
         login,

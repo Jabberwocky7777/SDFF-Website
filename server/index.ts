@@ -1,6 +1,5 @@
 import express from 'express'
 import cors from 'cors'
-import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sleeperRouter from './routes/sleeper.js'
@@ -15,7 +14,7 @@ import { getLeagues, toPublicLeague } from './config/leagues.js'
 import { bootstrapLeaguesIfEmpty } from './config/bootstrap.js'
 import { maybeResetAdmin } from './auth/admin.js'
 import { getDb } from './db/index.js'
-import { die } from './fatal.js'
+import { die, fatal, trace } from './fatal.js'
 import { startScheduler } from './sync/scheduler.js'
 import { autoBackfillIfNeeded } from './sync/autobackfill.js'
 import {
@@ -28,125 +27,107 @@ import {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const PORT = Number(process.env.SERVER_PORT ?? 3001)
+const IS_DEV = process.env.NODE_ENV !== 'production'
 
-console.log(
-  `[startup] SDFF hub — node ${process.version}, uid ${process.getuid?.() ?? '?'}, ` +
-    `cwd ${process.cwd()}, CACHE_DIR ${process.env.CACHE_DIR ?? '(default)'}`,
+trace(
+  `SDFF hub — node ${process.version}, uid ${process.getuid?.() ?? '?'}, ` +
+    `cwd ${process.cwd()}, CACHE_DIR ${process.env.CACHE_DIR ?? '(default)'}, port ${PORT}`,
 )
 
-// Surface anything that would otherwise kill the process silently.
+process.on('unhandledRejection', (err) => fatal('unhandledRejection', err))
 process.on('uncaughtException', (err) => die('uncaughtException', err))
-process.on('unhandledRejection', (err) => {
-  fatalLog('unhandledRejection', err)
-})
-function fatalLog(what: string, err: unknown): void {
-  fs.writeSync(2, `\n[error] ${what}: ${err instanceof Error ? err.stack : String(err)}\n`)
-}
 
-// Open the SQLite DB (runs migrations), migrate any legacy config into it, then
-// start the sync scheduler.
+// ── Bring up the database (best-effort) ────────────────────────────────────
+// If it fails we still start the HTTP server in a diagnostic mode so the error
+// is visible in a browser and the container stays up instead of crash-looping.
+let dbError: string | null = null
 try {
   const db = getDb()
-  console.log('[startup] db open + migrated')
+  trace('db ready')
   maybeResetAdmin(db)
   bootstrapLeaguesIfEmpty(db)
   const slugs = getLeagues(db).map((l) => l.slug)
-  console.log(`[startup] ready — leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
+  trace(`leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
   startScheduler()
 } catch (err) {
-  die('startup failed after opening the database', err)
+  dbError = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
+  fatal('database initialisation failed — starting in diagnostic mode', err)
 }
 
 const app = express()
-const PORT = Number(process.env.SERVER_PORT ?? 3001)
-const IS_DEV = process.env.NODE_ENV !== 'production'
-app.set('trust proxy', true) // behind a reverse proxy — needed for req.ip rate limiting
+app.set('trust proxy', true)
 
-// Health check — no auth required
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' })
+  res.json({ status: dbError ? 'degraded' : 'ok' })
 })
 
-// Static files and SPA fallback — served without auth so React can load
-const distPath = path.join(__dirname, '..', 'dist')
-app.use(express.static(distPath))
-app.get('/{*splat}', (_req, res, next) => {
-  // Only serve index.html for non-API routes
-  if (_req.path.startsWith('/api/')) return next()
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+// Diagnostic mode: DB is down. Serve a plain page explaining it, 503 everything
+// else, and skip the rest of the app.
+if (dbError) {
+  const page = (msg: string) =>
+    `<!doctype html><meta charset=utf8><title>SDFF — setup problem</title>` +
+    `<body style="font:15px/1.5 system-ui;background:#111214;color:#F4EFE2;padding:2rem;max-width:46rem;margin:auto">` +
+    `<h1 style="color:#E0B544">The database couldn't start</h1>` +
+    `<p>The app stores its history in a SQLite file under <code>${process.env.CACHE_DIR ?? '/app/cache'}</code>. ` +
+    `Something is stopping it from being created — usually the persistent volume is read-only, ` +
+    `mounted at the wrong path, or unwritable.</p>` +
+    `<pre style="background:#1A1C22;border:1px solid #333;padding:1rem;border-radius:8px;white-space:pre-wrap;overflow:auto">${msg
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')}</pre>` +
+    `<p>Fix the volume (TrueNAS: an <b>ixVolume</b> mounted at <code>/app/cache</code>, not read-only) and restart.</p>` +
+    `</body>`
+  app.get('/{*splat}', (req, res) => {
+    res.status(req.path === '/' ? 200 : 503).type('html').send(page(dbError!))
+  })
+  app.listen(PORT, () => trace(`diagnostic server listening on :${PORT}`)).on('error', (err) =>
+    fatal(`could not bind port ${PORT}`, err),
+  )
+} else {
+  // ── Normal app ──────────────────────────────────────────────────────────
+  const distPath = path.join(__dirname, '..', 'dist')
+  app.use(express.static(distPath))
+  app.get('/{*splat}', (_req, res, next) => {
+    if (_req.path.startsWith('/api/')) return next()
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
 
-// JSON body parsing for API routes
-app.use(express.json())
+  app.use(express.json())
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('X-Frame-Options', 'DENY')
+    next()
+  })
+  if (IS_DEV) app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 
-// Security headers
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('X-Frame-Options', 'DENY')
-  next()
-})
+  app.use(attachAuth)
+  app.use('/api', setupRouter)
+  app.use('/api', authRouter)
+  app.get('/api/me', requireAuth, (_req, res) => res.json({ ok: true }))
+  app.use('/api/admin', requireAuth, requireAdmin)
+  app.use('/api', adminLeaguesRouter)
+  app.get('/api/leagues', requireAuth, (req, res) => {
+    const all = getLeagues()
+    const visible = req.auth?.admin ? all : all.filter((l) => req.auth?.slugs.includes(l.slug))
+    res.json(visible.map(toPublicLeague))
+  })
+  app.use('/api/leagues/:slug', requireLeagueAccess, leaguesRouter)
+  app.use('/api', requireAuth)
+  app.use('/api', announcementsRouter)
+  app.use('/api', requireDefaultLeagueAccess, sleeperRouter)
+  app.use('/api', requireDefaultLeagueAccess, draftRouter)
+  app.use('/api', adminRouter)
 
-// CORS — only allow in dev
-if (IS_DEV) {
-  app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
+  const server = app.listen(PORT, () => {
+    trace(`listening on :${PORT}`)
+    if (IS_DEV) console.log('[dev] open the app to set up the admin password / add leagues')
+    setTimeout(() => {
+      try {
+        autoBackfillIfNeeded(getDb())
+      } catch (err) {
+        console.error('[autobackfill] could not start:', err)
+      }
+    }, 8000)
+  })
+  server.on('error', (err) => fatal(`could not bind port ${PORT}`, err))
 }
-
-// Populate req.auth from the session cookie (never rejects).
-app.use(attachAuth)
-
-// First-run setup + auth endpoints — reachable without a session.
-app.use('/api', setupRouter)
-app.use('/api', authRouter)
-
-// Lightweight credential check used by older frontend code.
-app.get('/api/me', requireAuth, (_req, res) => {
-  res.json({ ok: true })
-})
-
-// Everything under /api/admin/* requires an admin session.
-app.use('/api/admin', requireAuth, requireAdmin)
-
-// Admin settings API (manage leagues, codes, password).
-app.use('/api', adminLeaguesRouter)
-
-// Configured leagues the caller can see (safe fields only — never access codes).
-app.get('/api/leagues', requireAuth, (req, res) => {
-  const all = getLeagues()
-  const visible = req.auth?.admin ? all : all.filter((l) => req.auth?.slugs.includes(l.slug))
-  res.json(visible.map(toPublicLeague))
-})
-
-// Namespaced per-league API. requireLeagueAccess validates :slug against config
-// (404 for unknown) and the session's allowed slugs (403).
-app.use('/api/leagues/:slug', requireLeagueAccess, leaguesRouter)
-
-// Everything below requires a valid session (or legacy Basic Auth).
-app.use('/api', requireAuth)
-
-// Announcements — visible to any authenticated visitor.
-app.use('/api', announcementsRouter)
-
-// Legacy single-league routes serve the DEFAULT league — gate them so a
-// session that only unlocked a different league can't read it here.
-app.use('/api', requireDefaultLeagueAccess, sleeperRouter)
-app.use('/api', requireDefaultLeagueAccess, draftRouter)
-
-// Editable admin data (dues, championship history, squad pot)
-app.use('/api', adminRouter)
-
-const server = app.listen(PORT, () => {
-  console.log(`[startup] listening on :${PORT}`)
-  if (IS_DEV) console.log('[dev] open the app to set up the admin password / add leagues')
-
-  // First-run: self-populate history for any league not yet ingested. Deferred
-  // a few seconds so the health check goes green before the backfill load.
-  setTimeout(() => {
-    try {
-      autoBackfillIfNeeded(getDb())
-    } catch (err) {
-      console.error('[autobackfill] could not start:', err)
-    }
-  }, 8000)
-})
-
-server.on('error', (err) => die(`could not bind port ${PORT}`, err))

@@ -45,6 +45,18 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return useAuth().admin ? <>{children}</> : <Navigate to="/" replace />
 }
 
+function StorageBanner() {
+  const { ephemeralStorage } = useAuth()
+  if (!ephemeralStorage) return null
+  return (
+    <div className="fixed top-0 inset-x-0 z-[100] bg-red-600 text-white text-small font-medium px-4 py-2 text-center">
+      ⚠ Storage isn't persistent — the <code>/app/cache</code> volume can't be written, so your
+      password and leagues will be lost on restart. Fix the volume (an ixVolume mounted at{' '}
+      <code>/app/cache</code>, not read-only) and restart.
+    </div>
+  )
+}
+
 function AppRoutes() {
   const { authed, checking, needsSetup } = useAuth()
 
@@ -56,11 +68,24 @@ function AppRoutes() {
     )
   }
 
-  if (needsSetup) return <SetupScreen />
-  if (!authed) return <SplashScreen />
+  if (needsSetup)
+    return (
+      <>
+        <StorageBanner />
+        <SetupScreen />
+      </>
+    )
+  if (!authed)
+    return (
+      <>
+        <StorageBanner />
+        <SplashScreen />
+      </>
+    )
 
   return (
     <BrowserRouter>
+      <StorageBanner />
       <Routes>
         <Route path="/" element={<RootLayout />}>
           <Route index element={<HomeGate />} />

@@ -2,13 +2,12 @@ import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 import { requireAdmin } from '../auth/middleware.js'
+import { cacheDir } from '../db/index.js'
 
 const router = Router()
 
-const DATA_DIR = process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')
-
 function filePath(name: string) {
-  return path.join(DATA_DIR, name)
+  return path.join(cacheDir(), name)
 }
 
 function readJson<T>(file: string, fallback: T): T {
@@ -21,7 +20,7 @@ function readJson<T>(file: string, fallback: T): T {
 
 function writeJson(file: string, data: unknown): void {
   const tmp = file + '.tmp'
-  fs.mkdirSync(DATA_DIR, { recursive: true })
+  fs.mkdirSync(cacheDir(), { recursive: true })
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
   fs.renameSync(tmp, file)
 }
