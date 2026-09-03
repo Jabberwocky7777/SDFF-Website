@@ -33,5 +33,5 @@ RUN node -e "const D=require('better-sqlite3'); const db=new D('/tmp/c.db'); db.
 # storage (with a loud warning) rather than crashing if the volume is unusable.
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
-  CMD node -e "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const p=process.env.SERVER_PORT||3001;fetch('http://localhost:'+p+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist-server/index.js"]
