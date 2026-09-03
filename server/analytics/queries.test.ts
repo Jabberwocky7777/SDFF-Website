@@ -160,3 +160,138 @@ describe('unknown / not-yet-ingested league', () => {
     expect(getH2HGameLog(empty, 'nope', 'x', 'y').games).toEqual([])
   })
 })
+
+/**
+ * A blank family with a `game(season, week, aPts, bPts, opts)` writer, for the
+ * records tests that need to control game type and data quality per week.
+ */
+type GameOpts = { playoff?: boolean; consolation?: boolean; unscored?: 'a' | 'b' | 'both' }
+
+function customFixture(): {
+  db: DB
+  game: (season: number, week: number, a: number, b: number, opts?: GameOpts) => void
+} {
+  const db = freshDb()
+  db.prepare(
+    `INSERT INTO league_family (id, slug, display_name, league_type, current_league_id, sort_order)
+     VALUES (1, 'test', 'Test League', 'redraft', 'L2024', 1)`,
+  ).run()
+  db.prepare(`INSERT INTO manager (user_id, display_name) VALUES ('A','Ada'), ('B','Bo')`).run()
+
+  const seasons = new Set<number>()
+  const mk = db.prepare(
+    `INSERT INTO matchup (league_id, week, matchup_id, roster_id, user_id, points,
+                          opponent_roster_id, opponent_user_id, opponent_points, result,
+                          is_playoff, is_consolation, data_quality)
+     VALUES (@lid,@wk,1,@r,@u,@p,@or,@ou,@op,@res,@po,@con,@dq)`,
+  )
+
+  const game = (
+    season: number,
+    week: number,
+    aP: number,
+    bP: number,
+    opts: GameOpts = {},
+  ) => {
+    const lid = `L${season}`
+    if (!seasons.has(season)) {
+      db.prepare(
+        `INSERT INTO league_season (league_id, family_id, season, status, total_rosters)
+         VALUES (?, 1, ?, 'complete', 2)`,
+      ).run(lid, season)
+      seasons.add(season)
+    }
+    const aRes = aP > bP ? 'W' : aP < bP ? 'L' : 'T'
+    const bRes = aRes === 'W' ? 'L' : aRes === 'L' ? 'W' : 'T'
+    // Only the team whose lineup Sleeper lost is flagged — the opponent's own
+    // score is real, which is the distinction the records book has to make.
+    const flagged = (side: 'a' | 'b') =>
+      opts.unscored === 'both' || opts.unscored === side ? 'unscored' : null
+    const shared = {
+      lid,
+      wk: week,
+      po: opts.playoff ? 1 : 0,
+      con: opts.consolation ? 1 : 0,
+    }
+    mk.run({ ...shared, r: 1, u: 'A', p: aP, or: 2, ou: 'B', op: bP, res: aRes, dq: flagged('a') })
+    mk.run({ ...shared, r: 2, u: 'B', p: bP, or: 1, ou: 'A', op: aP, res: bRes, dq: flagged('b') })
+  }
+
+  return { db, game }
+}
+
+describe('getRecordsBook — games Sleeper could not score', () => {
+  it('drops a flagged score from the scoring records but keeps its opponent', () => {
+    const { db: d, game } = customFixture()
+    game(2024, 1, 120, 110)
+    game(2024, 2, 130, 105)
+    // Sleeper lost Bo's week-3 lineup: his 4 points and Ada's 150-point "blowout"
+    // are both artefacts of that, but Ada's own 150 really happened.
+    game(2024, 3, 150, 4, { unscored: 'b' })
+
+    const book = getRecordsBook(d, 'test')
+    expect(book.find((r) => r.label === 'Lowest single-week score')!.value).toBe(105)
+    expect(book.find((r) => r.label === 'Biggest blowout')!.value).toBe(25)
+    expect(book.find((r) => r.label === 'Highest single-week score')!.value).toBe(150)
+  })
+
+  it('explains how many games it left out', () => {
+    const { db: d, game } = customFixture()
+    game(2024, 1, 120, 110)
+    game(2024, 2, 150, 4, { unscored: 'b' })
+    const note = getRecordsBook(d, 'test').find((r) => r.note)
+    expect(note?.value).toBe(1)
+    expect(note?.note).toContain('1 game')
+  })
+})
+
+describe('getRecordsBook — streaks', () => {
+  it('carries a streak across a season boundary and reports the span', () => {
+    const { db: d, game } = customFixture()
+    game(2023, 12, 120, 100)
+    game(2023, 13, 120, 100)
+    game(2024, 1, 120, 100)
+    const win = getRecordsBook(d, 'test').find((r) => r.label === 'Longest win streak')!
+    expect(win.value).toBe(3)
+    expect(win.userId).toBe('A')
+    expect(win.span).toBe('2023 wk12 → 2024 wk1')
+  })
+
+  it('resets when a manager sits a season out', () => {
+    const { db: d, game } = customFixture()
+    game(2020, 1, 120, 100)
+    game(2020, 2, 120, 100)
+    // Nothing in 2021 or 2022 — the run does not bridge the gap.
+    game(2023, 1, 120, 100)
+    game(2023, 2, 120, 100)
+    const win = getRecordsBook(d, 'test').find((r) => r.label === 'Longest win streak')!
+    expect(win.value).toBe(2)
+  })
+
+  it('does not extend a streak through the consolation bracket', () => {
+    const { db: d, game } = customFixture()
+    game(2024, 1, 120, 100)
+    game(2024, 2, 120, 100)
+    game(2024, 3, 120, 100, { consolation: true })
+    const win = getRecordsBook(d, 'test').find((r) => r.label === 'Longest win streak')!
+    expect(win.value).toBe(2)
+  })
+
+  it('skips a lost week rather than breaking the streak on it', () => {
+    const { db: d, game } = customFixture()
+    game(2024, 1, 120, 100)
+    game(2024, 2, 4, 150, { unscored: 'a' }) // Ada "loses" a phantom game
+    game(2024, 3, 120, 100)
+    const win = getRecordsBook(d, 'test').find((r) => r.label === 'Longest win streak')!
+    expect(win.value).toBe(2)
+    expect(win.userId).toBe('A')
+  })
+
+  it('reports no win streak when nobody has won', () => {
+    const { db: d, game } = customFixture()
+    game(2024, 1, 100, 100) // a tie
+    const book = getRecordsBook(d, 'test')
+    expect(book.find((r) => r.label === 'Longest win streak')).toBeUndefined()
+    expect(book.find((r) => r.label === 'Longest losing streak')).toBeUndefined()
+  })
+})

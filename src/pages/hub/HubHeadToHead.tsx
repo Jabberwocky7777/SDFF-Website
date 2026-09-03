@@ -35,14 +35,6 @@ export default function HubHeadToHead() {
     queryFn: () => getH2HMatrix(slug),
   })
 
-  const initials = useMemo(() => {
-    const m = new Map<string, string>()
-    data?.managers.forEach((mgr) => {
-      m.set(mgr.userId, mgr.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase())
-    })
-    return m
-  }, [data])
-
   const hasPlayoffs = useMemo(
     () =>
       !!data &&
@@ -86,16 +78,22 @@ export default function HubHeadToHead() {
         <table className="border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 bg-surface z-10 p-2" />
+              <th className="sticky left-0 bg-surface z-20 p-2 w-[10rem] min-w-[10rem]" />
               {data.managers.map((m) => (
-                <th
-                  key={m.userId}
-                  className={`p-2 text-label font-mono font-semibold ${
-                    hover?.b === m.userId ? 'text-gold' : 'text-muted'
-                  }`}
-                  title={m.name}
-                >
-                  {initials.get(m.userId)}
+                <th key={m.userId} className="h-32 p-0 align-bottom" title={m.name}>
+                  {/* Names are rotated so full handles fit without the grid
+                      sprawling sideways. The wrapper is zero-height so the
+                      rotated text overflows upward instead of widening the
+                      column. */}
+                  <div className="h-0 flex justify-center">
+                    <span
+                      className={`inline-block origin-bottom-left -rotate-45 translate-x-1 whitespace-nowrap text-small font-semibold ${
+                        hover?.b === m.userId ? 'text-gold' : 'text-muted'
+                      }`}
+                    >
+                      {m.name}
+                    </span>
+                  </div>
                 </th>
               ))}
             </tr>
@@ -104,7 +102,7 @@ export default function HubHeadToHead() {
             {data.managers.map((rowM) => (
               <tr key={rowM.userId}>
                 <th
-                  className={`sticky left-0 bg-surface z-10 px-3 py-2 text-left text-small font-semibold whitespace-nowrap ${
+                  className={`sticky left-0 bg-surface z-10 px-3 py-2 text-left text-small font-semibold whitespace-nowrap w-[10rem] min-w-[10rem] ${
                     hover?.a === rowM.userId ? 'text-gold' : 'text-text'
                   }`}
                 >
@@ -123,7 +121,7 @@ export default function HubHeadToHead() {
                       onClick={() =>
                         rec && navigate(`/l/${slug}/head-to-head/${rowM.userId}/vs/${colM.userId}`)
                       }
-                      className={`border border-borderLow/40 text-center px-2.5 py-2 font-mono text-num tabular cursor-pointer transition-colors hover:bg-white/5 ${tone(rec)}`}
+                      className={`border border-borderLow/40 text-center px-2.5 py-2 font-mono text-num tabular whitespace-nowrap cursor-pointer transition-colors hover:bg-white/5 ${tone(rec)}`}
                     >
                       {rec && rec.meetings > 0
                         ? `${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ''}`

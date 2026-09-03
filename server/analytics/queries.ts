@@ -72,6 +72,7 @@ interface RawGame {
   league_id: string
   season: number
   week: number
+  matchup_id: number | null
   user_id: string
   points: number
   opponent_user_id: string | null
@@ -80,6 +81,8 @@ interface RawGame {
   is_playoff: number
   is_consolation: number
   median_result: 'W' | 'L' | null
+  /** NULL when trustworthy; 'unscored' when Sleeper lost the week's scores. */
+  data_quality: string | null
 }
 
 /** Every decided regular-season + playoff game in the family (one row per team per game). */
@@ -94,9 +97,9 @@ function familyGames(db: DB, slug: string, opts: { season?: number } = {}): RawG
   }
   return db
     .prepare(
-      `SELECT m.league_id, ls.season, m.week, m.user_id, m.points,
+      `SELECT m.league_id, ls.season, m.week, m.matchup_id, m.user_id, m.points,
               m.opponent_user_id, m.opponent_points, m.result,
-              m.is_playoff, m.is_consolation, m.median_result
+              m.is_playoff, m.is_consolation, m.median_result, m.data_quality
        FROM matchup m
        JOIN league_season ls ON ls.league_id = m.league_id
        WHERE ls.family_id = ?${seasonClause}
@@ -419,17 +422,41 @@ export interface RecordEntry {
   season: number | null
   week: number | null
   detail?: string
+  /** Set for records that span weeks, e.g. "2021 wk9 - 2022 wk3". */
+  span?: string
+  /** Set on the trailing note entry, which carries no value of its own. */
+  note?: string
+}
+
+/**
+ * A stable key for one head-to-head game (both teams share it), so a week whose
+ * scores Sleeper lost can be excluded from margin records on *both* sides.
+ */
+function gameKey(g: RawGame): string {
+  return `${g.league_id}:${g.week}:${g.matchup_id ?? `bye-${g.user_id}`}`
 }
 
 export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
-  const games = familyGames(db, slug)
-  if (games.length === 0) return []
-  const names = displayNames(db, games.map((g) => g.user_id))
+  const all = familyGames(db, slug)
+  if (all.length === 0) return []
+  const names = displayNames(
+    db,
+    all.map((g) => g.user_id),
+  )
   const nm = (id: string) => names.get(id) ?? id
+
+  // Sleeper sometimes returns a played week with the scores stripped out (see
+  // server/sync/dataQuality.ts). The flagged team's own score is meaningless,
+  // and so is the margin of that game — but the opponent's score is real, so it
+  // stays eligible for the scoring records.
+  const tainted = new Set(all.filter((g) => g.data_quality).map(gameKey))
+  const scoring = all.filter((g) => !g.data_quality)
+  const excluded = all.length - scoring.length
+  if (scoring.length === 0) return []
 
   const out: RecordEntry[] = []
 
-  const bySortDesc = [...games].sort((a, b) => b.points - a.points)
+  const bySortDesc = [...scoring].sort((a, b) => b.points - a.points)
   const highWeek = bySortDesc[0]
   out.push({
     label: 'Highest single-week score',
@@ -449,20 +476,22 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
     week: lowWeek.week,
   })
 
-  const withMargin = games
-    .filter((g) => g.opponent_points != null)
+  const withMargin = all
+    .filter((g) => g.opponent_points != null && !tainted.has(gameKey(g)))
     .map((g) => ({ ...g, margin: g.points - (g.opponent_points ?? 0) }))
 
   const blowout = [...withMargin].sort((a, b) => b.margin - a.margin)[0]
-  out.push({
-    label: 'Biggest blowout',
-    userId: blowout.user_id,
-    name: nm(blowout.user_id),
-    value: round2(blowout.margin),
-    season: blowout.season,
-    week: blowout.week,
-    detail: `${round2(blowout.points)}–${round2(blowout.opponent_points ?? 0)}`,
-  })
+  if (blowout) {
+    out.push({
+      label: 'Biggest blowout',
+      userId: blowout.user_id,
+      name: nm(blowout.user_id),
+      value: round2(blowout.margin),
+      season: blowout.season,
+      week: blowout.week,
+      detail: `${round2(blowout.points)}–${round2(blowout.opponent_points ?? 0)}`,
+    })
+  }
 
   const nailBiter = [...withMargin]
     .filter((g) => g.margin > 0)
@@ -479,7 +508,9 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
     })
   }
 
-  const highLoss = [...withMargin].filter((g) => g.result === 'L').sort((a, b) => b.points - a.points)[0]
+  const highLoss = [...withMargin]
+    .filter((g) => g.result === 'L')
+    .sort((a, b) => b.points - a.points)[0]
   if (highLoss) {
     out.push({
       label: 'Highest-scoring loss',
@@ -490,7 +521,9 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
       week: highLoss.week,
     })
   }
-  const lowWin = [...withMargin].filter((g) => g.result === 'W').sort((a, b) => a.points - b.points)[0]
+  const lowWin = [...withMargin]
+    .filter((g) => g.result === 'W')
+    .sort((a, b) => a.points - b.points)[0]
   if (lowWin) {
     out.push({
       label: 'Lowest-scoring win',
@@ -505,20 +538,24 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
   const highCombined = [...withMargin].sort(
     (a, b) => b.points + (b.opponent_points ?? 0) - (a.points + (a.opponent_points ?? 0)),
   )[0]
-  out.push({
-    label: 'Highest combined score',
-    userId: null,
-    name: null,
-    value: round2(highCombined.points + (highCombined.opponent_points ?? 0)),
-    season: highCombined.season,
-    week: highCombined.week,
-    detail: `${nm(highCombined.user_id)} vs ${
-      highCombined.opponent_user_id ? nm(highCombined.opponent_user_id) : '?'
-    }`,
-  })
+  if (highCombined) {
+    out.push({
+      label: 'Highest combined score',
+      userId: null,
+      name: null,
+      value: round2(highCombined.points + (highCombined.opponent_points ?? 0)),
+      season: highCombined.season,
+      week: highCombined.week,
+      detail: `${nm(highCombined.user_id)} vs ${
+        highCombined.opponent_user_id ? nm(highCombined.opponent_user_id) : '?'
+      }`,
+    })
+  }
 
-  // Streaks.
-  const streak = longestStreaks(games)
+  // Streaks. Consolation games are excluded here, as they are everywhere else
+  // outside the records book — extending a win streak through the toilet bowl
+  // is not the record anyone means.
+  const streak = longestStreaks(scoring.filter((g) => !g.is_consolation))
   if (streak.win) {
     out.push({
       label: 'Longest win streak',
@@ -527,6 +564,7 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
       value: streak.win.length,
       season: null,
       week: null,
+      span: streakSpan(streak.win),
     })
   }
   if (streak.loss) {
@@ -537,35 +575,109 @@ export function getRecordsBook(db: DB, slug: string): RecordEntry[] {
       value: streak.loss.length,
       season: null,
       week: null,
+      span: streakSpan(streak.loss),
+    })
+  }
+
+  if (excluded > 0) {
+    out.push({
+      label: 'Note',
+      userId: null,
+      name: null,
+      value: excluded,
+      season: null,
+      week: null,
+      note: `${excluded} ${
+        excluded === 1 ? 'game is' : 'games are'
+      } left out of the scoring records — Sleeper has no usable scores for them. The results still count in the standings.`,
     })
   }
 
   return out
 }
 
-function longestStreaks(games: RawGame[]): {
-  win: { userId: string; length: number } | null
-  loss: { userId: string; length: number } | null
-} {
+interface Streak {
+  userId: string
+  length: number
+  fromSeason: number
+  fromWeek: number
+  toSeason: number
+  toWeek: number
+}
+
+function streakSpan(s: Streak): string {
+  const from = `${s.fromSeason} wk${s.fromWeek}`
+  const to = `${s.toSeason} wk${s.toWeek}`
+  return from === to ? from : `${from} → ${to}`
+}
+
+/**
+ * Longest consecutive win and loss runs across the family's history.
+ *
+ * Streaks carry across seasons — finishing one year hot and starting the next
+ * the same way is a real run — but they reset when a manager sits a season out
+ * entirely, since those games never happened rather than being wins or losses.
+ */
+function longestStreaks(games: RawGame[]): { win: Streak | null; loss: Streak | null } {
   const byUser = new Map<string, RawGame[]>()
   for (const g of games) {
     const list = byUser.get(g.user_id) ?? []
     list.push(g)
     byUser.set(g.user_id, list)
   }
-  let win: { userId: string; length: number } | null = null
-  let loss: { userId: string; length: number } | null = null
+
+  let win: Streak | null = null
+  let loss: Streak | null = null
+
   for (const [userId, list] of byUser) {
     list.sort((a, b) => a.season - b.season || a.week - b.week)
     let curW = 0
     let curL = 0
+    let startW: RawGame | null = null
+    let startL: RawGame | null = null
+    let prev: RawGame | null = null
+
     for (const g of list) {
-      curW = g.result === 'W' ? curW + 1 : 0
-      curL = g.result === 'L' ? curL + 1 : 0
-      if (!win || curW > win.length) win = { userId, length: curW }
-      if (!loss || curL > loss.length) loss = { userId, length: curL }
+      if (prev && g.season - prev.season > 1) {
+        curW = 0
+        curL = 0
+      }
+      if (g.result === 'W') {
+        if (curW === 0) startW = g
+        curW++
+        curL = 0
+      } else if (g.result === 'L') {
+        if (curL === 0) startL = g
+        curL++
+        curW = 0
+      } else {
+        curW = 0
+        curL = 0
+      }
+      if (startW && curW > (win?.length ?? 0)) {
+        win = {
+          userId,
+          length: curW,
+          fromSeason: startW.season,
+          fromWeek: startW.week,
+          toSeason: g.season,
+          toWeek: g.week,
+        }
+      }
+      if (startL && curL > (loss?.length ?? 0)) {
+        loss = {
+          userId,
+          length: curL,
+          fromSeason: startL.season,
+          fromWeek: startL.week,
+          toSeason: g.season,
+          toWeek: g.week,
+        }
+      }
+      prev = g
     }
   }
+
   return { win, loss }
 }
 

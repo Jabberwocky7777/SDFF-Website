@@ -16,6 +16,7 @@ import {
   matchupSchema,
   nflStateSchema,
   rosterSchema,
+  seasonStatsSchema,
   transactionSchema,
   tradedPickSchema,
   userSchema,
@@ -30,6 +31,7 @@ import {
   type SleeperTransaction,
   type SleeperUser,
   type NflState,
+  type SeasonStats,
   type TradedPick,
 } from './schemas.js'
 
@@ -274,6 +276,16 @@ export class SleeperClient {
     const raw = await this.request('/players/nfl')
     if (raw == null || typeof raw !== 'object') return {}
     return raw as Record<string, SleeperPlayer>
+  }
+
+  /**
+   * Regular-season stat totals for every NFL player, keyed by player id. The
+   * inner keys line up with a league's `scoring_settings`, so dotting the two
+   * gives that league's own season points. A few MB — cache it, and expect
+   * null for seasons Sleeper has no stats for.
+   */
+  getSeasonStats(season: number): Promise<SeasonStats | null> {
+    return this.getValidated(`/stats/nfl/regular/${season}`, seasonStatsSchema)
   }
 }
 

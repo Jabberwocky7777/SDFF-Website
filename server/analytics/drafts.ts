@@ -7,6 +7,7 @@
  */
 import type { DB } from '../db/index.js'
 import { getFamily } from './queries.js'
+import { getPositionalFinishes } from './playerSeason.js'
 
 export interface DraftSlot {
   slot: number
@@ -35,6 +36,12 @@ export interface DraftPickView {
   position: string | null
   nflTeam: string | null
   isKeeper: boolean
+  /** Where he finished at his position that season, under this league's scoring. */
+  posRank: number | null
+  /** His season point total under this league's scoring. */
+  seasonPoints: number | null
+  /** How many players at this position were taken before him in this draft. */
+  posDraftOrder: number | null
 }
 
 export interface DraftBoardView extends DraftSeasonSummary {
@@ -157,10 +164,21 @@ export function getDraftBoard(db: DB, slug: string, season: number): DraftBoardV
     name: teamNames.get(rid) ?? `Team ${rid}`,
   }))
 
+  // Season finishes, plus where each player sat in his position's draft order,
+  // so the board can say whether a pick beat or missed its expectation.
+  const finishes = getPositionalFinishes(db, family.id, season)
+  const takenAtPosition = new Map<string, number>()
+
   const pickViews: DraftPickView[] = picks.map((p) => {
     const slot = p.roster_id != null ? slotOf.get(p.roster_id) ?? 0 : 0
     // "via trade" — the pick's slot roster differs from who actually made it.
     const slotOwnerId = p.roster_id != null ? slotOwner.get(p.roster_id) ?? null : null
+    const finish = p.player_id ? finishes.get(p.player_id) ?? null : null
+    let posDraftOrder: number | null = null
+    if (p.position) {
+      posDraftOrder = (takenAtPosition.get(p.position) ?? 0) + 1
+      takenAtPosition.set(p.position, posDraftOrder)
+    }
     return {
       pickNo: p.pick_no,
       round: p.round,
@@ -174,6 +192,9 @@ export function getDraftBoard(db: DB, slug: string, season: number): DraftBoardV
       position: p.position,
       nflTeam: p.nfl_team,
       isKeeper: !!p.is_keeper,
+      posRank: finish?.posRank ?? null,
+      seasonPoints: finish?.points ?? null,
+      posDraftOrder,
     }
   })
 

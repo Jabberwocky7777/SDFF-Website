@@ -85,6 +85,12 @@ function Side({
         Received {side.totals.assetsReceived} · {side.totals.assetsStillRostered} still rostered · PAR{' '}
         {fmtSigned(side.totals.par)}
       </div>
+      {side.totals.playoffStarted > 0 && (
+        <div className="text-small text-mutedLow mb-3">
+          {side.totals.regularStarted.toFixed(1)} regular season ·{' '}
+          {side.totals.playoffStarted.toFixed(1)} playoffs
+        </div>
+      )}
 
       {multiSeason && side.bySeason.length > 0 && <SeasonTable lines={side.bySeason} />}
 
@@ -151,7 +157,9 @@ export default function HubTradeDetail() {
             {trade.multiSeason
               ? 'Dynasty — each side’s return is tracked every season it stayed on the roster.'
               : 'Redraft — scored only over the season the trade happened.'}{' '}
-            &ldquo;Started pts&rdquo; counts weeks in the lineup; PAR is versus a replacement-level starter.
+            &ldquo;Started pts&rdquo; counts weeks in the lineup across regular-season and playoff
+            games — consolation-bracket weeks don’t count. PAR is versus a replacement-level
+            starter that season.
           </p>
         )}
       </div>

@@ -14,12 +14,25 @@ const POS_TONE: Record<string, string> = {
   DEF: 'text-muted',
 }
 
+/**
+ * How the season finish compares to where the player went at his position.
+ * Beating your draft slot by a couple of spots is noise; the tones only kick in
+ * once a pick clearly worked out or clearly didn't.
+ */
+function finishTone(posRank: number, posDraftOrder: number | null): string {
+  if (posDraftOrder == null) return 'text-mutedLow'
+  const delta = posDraftOrder - posRank
+  if (delta >= 6) return 'text-green-300'
+  if (delta <= -6) return 'text-red-300'
+  return 'text-mutedLow'
+}
+
 function Cell({ pick }: { pick: DraftPickView | undefined }) {
   if (!pick) return <td className="border border-borderLow/40 bg-white/[0.02]" />
   const last = pick.playerName?.split(' ').slice(1).join(' ') || pick.playerName || '—'
   const first = pick.playerName?.split(' ')[0] ?? ''
   return (
-    <td className="border border-borderLow/40 px-2 py-1.5 align-top min-w-[8.5rem]">
+    <td className="border border-borderLow/40 px-2 py-1.5 align-top min-w-[9.5rem]">
       <div className="flex items-center gap-1.5">
         <span className={`text-label font-bold shrink-0 ${POS_TONE[pick.position ?? ''] ?? 'text-mutedLow'}`}>
           {pick.position ?? '?'}
@@ -34,8 +47,26 @@ function Cell({ pick }: { pick: DraftPickView | undefined }) {
         {pick.isKeeper && <span className="text-gold">K</span>}
         {pick.viaTrade && <span className="text-blue-300/70" title={`picked by ${pick.managerName}`}>⇄</span>}
       </div>
+      {pick.posRank != null && pick.position && (
+        <div
+          className={`text-label mt-0.5 font-mono tabular ${finishTone(pick.posRank, pick.posDraftOrder)}`}
+          title={`Finished ${pick.position}${pick.posRank} that season${
+            pick.posDraftOrder != null ? ` — ${pick.posDraftOrder}${ordinalSuffix(pick.posDraftOrder)} ${pick.position} drafted` : ''
+          }`}
+        >
+          {pick.position}
+          {pick.posRank}
+          {pick.seasonPoints != null && <span className="text-mutedLow"> · {pick.seasonPoints.toFixed(1)}</span>}
+        </div>
+      )}
     </td>
   )
+}
+
+function ordinalSuffix(n: number): string {
+  const v = n % 100
+  if (v >= 11 && v <= 13) return 'th'
+  return ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'
 }
 
 export default function HubDrafts() {
@@ -74,7 +105,8 @@ export default function HubDrafts() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <p className="text-body text-muted">
           Every completed draft — <span className="text-gold">K</span> = keeper,{' '}
-          <span className="text-blue-300/80">⇄</span> = pick made by another manager.
+          <span className="text-blue-300/80">⇄</span> = pick made by another manager. The second
+          line is where the player finished at his position that season, in this league's scoring.
         </p>
         <div className="flex gap-1 bg-surfaceHi border border-borderLow rounded-lg p-1 overflow-x-auto max-w-full">
           {seasons.data.map((s) => (

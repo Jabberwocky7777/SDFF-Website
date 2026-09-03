@@ -12,6 +12,8 @@ import type { LeagueRecord } from '../config/leagues.js'
 import { walkLeagueChain } from '../sleeper/chain.js'
 import { deriveCapabilities, type LeagueCapabilities } from './capabilities.js'
 import { deriveFinalRanks } from './brackets.js'
+import { classifyWeek, type QualityCandidate } from './dataQuality.js'
+import { syncFamilyScoring } from './playerStats.js'
 import {
   applyManagerAliases,
   finishSyncLog,
@@ -133,6 +135,9 @@ function normalizeWeek(
 ): NormalizedWeek {
   const rows: NormalizedWeek['rows'] = []
   const playerRows: NormalizedWeek['playerRows'] = []
+  // Parallel to `rows`, consumed after the loop: flagging a row needs the best
+  // score anyone posted this week, which isn't known until every row is built.
+  const candidates: QualityCandidate[] = []
 
   // Group by matchup_id to find opponents.
   const byMatchup = new Map<number, SleeperMatchup[]>()
@@ -184,10 +189,16 @@ function normalizeWeek(
       isPlayoff: isPlayoffWeek && inPlayoffBracket,
       isConsolation: isPlayoffWeek && !inPlayoffBracket,
       medianResult,
+      dataQuality: null,
       startersJson: m.starters ? JSON.stringify(m.starters) : null,
       startersPointsJson: m.starters_points ? JSON.stringify(m.starters_points) : null,
       playersJson: m.players ? JSON.stringify(m.players) : null,
       playersPointsJson: m.players_points ? JSON.stringify(m.players_points) : null,
+    })
+    candidates.push({
+      points,
+      starters: m.starters ?? null,
+      startersPoints: m.starters_points ?? null,
     })
 
     // Flatten weekly roster snapshot.
@@ -206,6 +217,12 @@ function normalizeWeek(
       })
     }
   }
+
+  const quality = classifyWeek(candidates)
+  quality.forEach((q, i) => {
+    const row = rows[i]
+    if (row) row.dataQuality = q
+  })
 
   return { rows, playerRows }
 }
@@ -601,6 +618,10 @@ export async function ingestFamily(
         throw err
       }
     }
+
+    // Positional finishes depend on every season's scoring settings being in
+    // place, so this runs after the seasons above rather than per-season.
+    await syncFamilyScoring(db, client, familyId)
 
     finishSyncLog(db, syncId, 'ok')
     log(`\n=== ${entry.slug} done (${client.stats.requestCount} Sleeper requests total) ===`)

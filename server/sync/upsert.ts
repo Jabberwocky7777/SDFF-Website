@@ -4,6 +4,7 @@
  * already-normalized rows.
  */
 import type { DB } from '../db/index.js'
+import type { DataQuality } from './dataQuality.js'
 
 export interface LeagueSeasonRow {
   leagueId: string
@@ -163,6 +164,8 @@ export interface MatchupRow {
   isPlayoff: boolean
   isConsolation: boolean
   medianResult: 'W' | 'L' | null
+  /** NULL when the row's scores are trustworthy; see server/sync/dataQuality.ts. */
+  dataQuality: DataQuality | null
   startersJson: string | null
   startersPointsJson: string | null
   playersJson: string | null
@@ -174,12 +177,12 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
     `INSERT INTO matchup (
        league_id, week, matchup_id, roster_id, user_id, points,
        opponent_roster_id, opponent_user_id, opponent_points, result,
-       is_playoff, is_consolation, median_result,
+       is_playoff, is_consolation, median_result, data_quality,
        starters_json, starters_points_json, players_json, players_points_json
      ) VALUES (
        @leagueId, @week, @matchupId, @rosterId, @userId, @points,
        @opponentRosterId, @opponentUserId, @opponentPoints, @result,
-       @isPlayoff, @isConsolation, @medianResult,
+       @isPlayoff, @isConsolation, @medianResult, @dataQuality,
        @startersJson, @startersPointsJson, @playersJson, @playersPointsJson
      )
      ON CONFLICT(league_id, week, roster_id) DO UPDATE SET
@@ -193,6 +196,7 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
        is_playoff = excluded.is_playoff,
        is_consolation = excluded.is_consolation,
        median_result = excluded.median_result,
+       data_quality = excluded.data_quality,
        starters_json = excluded.starters_json,
        starters_points_json = excluded.starters_points_json,
        players_json = excluded.players_json,

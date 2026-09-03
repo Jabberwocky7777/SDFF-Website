@@ -27,6 +27,10 @@ export interface SeasonLine {
   season: number
   pointsRostered: number
   pointsStarted: number
+  /** Started points from regular-season games only. */
+  regularStarted: number
+  /** Started points from winners-bracket playoff games only. */
+  playoffStarted: number
   par: number
   weeksRostered: number
   weeksStarted: number
@@ -44,6 +48,8 @@ export interface TradeAssetView {
   /** Grand totals across every season above. */
   pointsRostered: number
   pointsStarted: number
+  regularStarted: number
+  playoffStarted: number
   par: number
   weeksRostered: number
   weeksStarted: number
@@ -61,6 +67,8 @@ export interface TradeSideView {
   totals: {
     pointsRostered: number
     pointsStarted: number
+    regularStarted: number
+    playoffStarted: number
     par: number
     assetsReceived: number
     assetsStillRostered: number
@@ -91,7 +99,16 @@ function round2(n: number): number {
 }
 
 function emptyLine(season: number): SeasonLine {
-  return { season, pointsRostered: 0, pointsStarted: 0, par: 0, weeksRostered: 0, weeksStarted: 0 }
+  return {
+    season,
+    pointsRostered: 0,
+    pointsStarted: 0,
+    regularStarted: 0,
+    playoffStarted: 0,
+    par: 0,
+    weeksRostered: 0,
+    weeksStarted: 0,
+  }
 }
 
 function roundLine(l: SeasonLine): SeasonLine {
@@ -99,6 +116,8 @@ function roundLine(l: SeasonLine): SeasonLine {
     season: l.season,
     pointsRostered: round2(l.pointsRostered),
     pointsStarted: round2(l.pointsStarted),
+    regularStarted: round2(l.regularStarted),
+    playoffStarted: round2(l.playoffStarted),
     par: round2(l.par),
     weeksRostered: l.weeksRostered,
     weeksStarted: l.weeksStarted,
@@ -109,6 +128,8 @@ function roundLine(l: SeasonLine): SeasonLine {
 function addLine(a: SeasonLine, b: SeasonLine): void {
   a.pointsRostered += b.pointsRostered
   a.pointsStarted += b.pointsStarted
+  a.regularStarted += b.regularStarted
+  a.playoffStarted += b.playoffStarted
   a.par += b.par
   a.weeksRostered += b.weeksRostered
   a.weeksStarted += b.weeksStarted
@@ -132,12 +153,22 @@ function grandTotals(bySeason: SeasonLine[]) {
     (acc, l) => {
       acc.pointsRostered += l.pointsRostered
       acc.pointsStarted += l.pointsStarted
+      acc.regularStarted += l.regularStarted
+      acc.playoffStarted += l.playoffStarted
       acc.par += l.par
       acc.weeksRostered += l.weeksRostered
       acc.weeksStarted += l.weeksStarted
       return acc
     },
-    { pointsRostered: 0, pointsStarted: 0, par: 0, weeksRostered: 0, weeksStarted: 0 },
+    {
+      pointsRostered: 0,
+      pointsStarted: 0,
+      regularStarted: 0,
+      playoffStarted: 0,
+      par: 0,
+      weeksRostered: 0,
+      weeksStarted: 0,
+    },
   )
 }
 
@@ -147,7 +178,10 @@ interface FamilyCtx {
   names: Map<string, string>
   playerName: Map<string, string>
   playerPos: Map<string, string>
+  /** 25th-percentile started score, keyed `season:position`. */
   replacement: Map<string, number>
+  /** Same, keyed `position`, pooled across every season — the fallback. */
+  replacementAll: Map<string, number>
   latest: { season: number; week: number } | null
   rosteredNow: Set<string>
 }
@@ -171,25 +205,44 @@ function buildContext(db: DB, familyId: number, dynasty: boolean): FamilyCtx {
     if (p.position) playerPos.set(p.player_id, p.position)
   }
 
+  // Replacement level is per season as well as per position: a 2018 flex start
+  // and a 2025 one are not the same bar, and pooling them skews PAR for every
+  // trade at the ends of the family's history. Seasons with too small a sample
+  // fall back to the pooled figure.
+  const MIN_SAMPLE = 20
   const replacement = new Map<string, number>()
+  const replacementAll = new Map<string, number>()
   const byPos = new Map<string, number[]>()
+  const bySeasonPos = new Map<string, number[]>()
   for (const row of db
     .prepare(
-      `SELECT p.position AS position, pwr.points AS points
+      `SELECT ls.season AS season, p.position AS position, pwr.points AS points
        FROM player_week_roster pwr
        JOIN league_season ls ON ls.league_id = pwr.league_id
        JOIN player p ON p.player_id = pwr.player_id
-       WHERE ls.family_id = ? AND pwr.started = 1 AND pwr.points IS NOT NULL`,
+       JOIN matchup mu ON mu.league_id = pwr.league_id
+                      AND mu.week = pwr.week
+                      AND mu.roster_id = pwr.roster_id
+       WHERE ls.family_id = ? AND pwr.started = 1 AND pwr.points IS NOT NULL
+         AND mu.result IS NOT NULL AND mu.is_consolation = 0 AND mu.data_quality IS NULL`,
     )
-    .all(familyId) as Array<{ position: string | null; points: number }>) {
+    .all(familyId) as Array<{ season: number; position: string | null; points: number }>) {
     const pos = row.position ?? 'OTHER'
-    const list = byPos.get(pos) ?? []
-    list.push(row.points)
-    byPos.set(pos, list)
+    const all = byPos.get(pos) ?? []
+    all.push(row.points)
+    byPos.set(pos, all)
+    const key = `${row.season}:${pos}`
+    const seasonal = bySeasonPos.get(key) ?? []
+    seasonal.push(row.points)
+    bySeasonPos.set(key, seasonal)
   }
-  for (const [pos, list] of byPos) {
+  const percentile25 = (list: number[]) => {
     list.sort((a, b) => a - b)
-    replacement.set(pos, list[Math.floor(list.length * 0.25)] ?? 0)
+    return list[Math.floor(list.length * 0.25)] ?? 0
+  }
+  for (const [pos, list] of byPos) replacementAll.set(pos, percentile25(list))
+  for (const [key, list] of bySeasonPos) {
+    if (list.length >= MIN_SAMPLE) replacement.set(key, percentile25(list))
   }
 
   const latestRow = db
@@ -228,7 +281,17 @@ function buildContext(db: DB, familyId: number, dynasty: boolean): FamilyCtx {
     }
   }
 
-  return { familyId, dynasty, names, playerName, playerPos, replacement, latest, rosteredNow }
+  return {
+    familyId,
+    dynasty,
+    names,
+    playerName,
+    playerPos,
+    replacement,
+    replacementAll,
+    latest,
+    rosteredNow,
+  }
 }
 
 interface RawTrade {
@@ -255,6 +318,15 @@ interface RawAsset {
  * Per-season points a player produced for `userId`, starting at
  * (fromSeason, fromWeek). Dynasty families follow the asset forward; everyone
  * else stops at the end of `fromSeason`.
+ *
+ * Only weeks that manager actually played count. Joining each roster week to
+ * the manager's own matchup row bounds the window at that season's last real
+ * game, drops weeks they had been eliminated from entirely, and drops
+ * consolation-bracket weeks — points scored in the toilet bowl are not a
+ * return on a trade. It also splits the total into regular-season and
+ * winners-bracket playoff production, and skips weeks whose scores Sleeper
+ * lost (see server/sync/dataQuality.ts). The join is on `roster_id`, which is
+ * matchup's primary key alongside league and week.
  */
 function attributePlayer(
   db: DB,
@@ -270,20 +342,29 @@ function attributePlayer(
 
   const rows = db
     .prepare(
-      `SELECT ls.season AS season, pwr.points AS points, pwr.started AS started
+      `SELECT ls.season AS season, pwr.points AS points, pwr.started AS started,
+              mu.is_playoff AS is_playoff
        FROM player_week_roster pwr
        JOIN league_season ls ON ls.league_id = pwr.league_id
+       JOIN matchup mu ON mu.league_id = pwr.league_id
+                      AND mu.week = pwr.week
+                      AND mu.roster_id = pwr.roster_id
        WHERE ls.family_id = @fam AND pwr.player_id = @pid AND pwr.user_id = @uid
-         AND pwr.points IS NOT NULL AND ${seasonClause}`,
+         AND pwr.points IS NOT NULL
+         AND mu.result IS NOT NULL
+         AND mu.is_consolation = 0
+         AND mu.data_quality IS NULL
+         AND ${seasonClause}`,
     )
     .all({ fam: ctx.familyId, pid: playerId, uid: userId, s: fromSeason, w: fromWeek }) as Array<{
     season: number
     points: number
     started: number
+    is_playoff: number
   }>
 
   const pos = ctx.playerPos.get(playerId) ?? 'OTHER'
-  const repl = ctx.replacement.get(pos) ?? ctx.replacement.get('OTHER') ?? 0
+  const fallback = ctx.replacementAll.get(pos) ?? ctx.replacementAll.get('OTHER') ?? 0
 
   const by = new Map<number, SeasonLine>()
   for (const r of rows) {
@@ -291,7 +372,10 @@ function attributePlayer(
     line.pointsRostered += r.points
     line.weeksRostered++
     if (r.started) {
+      const repl = ctx.replacement.get(`${r.season}:${pos}`) ?? fallback
       line.pointsStarted += r.points
+      if (r.is_playoff) line.playoffStarted += r.points
+      else line.regularStarted += r.points
       line.par += r.points - repl
       line.weeksStarted++
     }
@@ -342,7 +426,7 @@ function pickLabel(a: RawAsset): string {
 }
 
 function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId: string): TradeAssetView {
-  const sinceWeek = trade.is_offseason ? 1 : Math.max(1, trade.week ?? 1)
+  const tradeWeek = trade.is_offseason ? 1 : Math.max(1, trade.week ?? 1)
 
   const base: TradeAssetView = {
     type: a.asset_type,
@@ -359,6 +443,8 @@ function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId
     bySeason: [],
     pointsRostered: 0,
     pointsStarted: 0,
+    regularStarted: 0,
+    playoffStarted: 0,
     par: 0,
     weeksRostered: 0,
     weeksStarted: 0,
@@ -382,10 +468,15 @@ function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId
   }
 
   if (attributedPlayerId) {
+    // A pick cashed in a later season starts counting at that season's week 1;
+    // the week the trade happened has nothing to do with the rookie's year.
+    const sinceWeek = fromSeason > trade.season ? 1 : tradeWeek
     base.bySeason = attributePlayer(db, ctx, attributedPlayerId, userId, fromSeason, sinceWeek)
     const g = grandTotals(base.bySeason)
     base.pointsRostered = round2(g.pointsRostered)
     base.pointsStarted = round2(g.pointsStarted)
+    base.regularStarted = round2(g.regularStarted)
+    base.playoffStarted = round2(g.playoffStarted)
     base.par = round2(g.par)
     base.weeksRostered = g.weeksRostered
     base.weeksStarted = g.weeksStarted
@@ -426,6 +517,8 @@ function buildView(db: DB, ctx: FamilyCtx, trade: RawTrade): TradeView {
       totals: {
         pointsRostered: round2(g.pointsRostered),
         pointsStarted: round2(g.pointsStarted),
+        regularStarted: round2(g.regularStarted),
+        playoffStarted: round2(g.playoffStarted),
         par: round2(g.par),
         assetsReceived: received.length,
         assetsStillRostered: received.filter((r) => r.stillRostered).length,

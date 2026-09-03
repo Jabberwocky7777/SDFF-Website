@@ -263,6 +263,10 @@ export interface RecordEntry {
   season: number | null
   week: number | null
   detail?: string
+  /** Set for records that span weeks, e.g. "2021 wk9 → 2022 wk3". */
+  span?: string
+  /** Set on the trailing note entry, which carries no value of its own. */
+  note?: string
 }
 
 export const getRecords = (slug: string) => hubFetch<RecordEntry[]>(`/leagues/${slug}/records`)
@@ -378,6 +382,8 @@ export interface SeasonLine {
   season: number
   pointsRostered: number
   pointsStarted: number
+  regularStarted: number
+  playoffStarted: number
   par: number
   weeksRostered: number
   weeksStarted: number
@@ -393,6 +399,8 @@ export interface TradeAssetView {
   bySeason: SeasonLine[]
   pointsRostered: number
   pointsStarted: number
+  regularStarted: number
+  playoffStarted: number
   par: number
   weeksRostered: number
   weeksStarted: number
@@ -409,6 +417,8 @@ export interface TradeSideView {
   totals: {
     pointsRostered: number
     pointsStarted: number
+    regularStarted: number
+    playoffStarted: number
     par: number
     assetsReceived: number
     assetsStillRostered: number
@@ -470,6 +480,12 @@ export interface DraftPickView {
   position: string | null
   nflTeam: string | null
   isKeeper: boolean
+  /** Where he finished at his position that season, under this league's scoring. */
+  posRank: number | null
+  /** His season point total under this league's scoring. */
+  seasonPoints: number | null
+  /** How many players at this position were taken before him in this draft. */
+  posDraftOrder: number | null
 }
 
 export interface DraftBoardView extends DraftSeasonSummary {

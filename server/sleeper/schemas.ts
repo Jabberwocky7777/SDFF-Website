@@ -194,3 +194,14 @@ export const playerSchema = z
   })
   .loose()
 export type SleeperPlayer = z.infer<typeof playerSchema>
+
+/**
+ * `/stats/nfl/regular/:season` — one stat bag per player id. Sleeper mixes in
+ * the occasional non-numeric value, so non-numbers are tolerated and dropped by
+ * the caller rather than failing the whole season.
+ */
+export const seasonStatsSchema = z.record(
+  z.string(),
+  z.record(z.string(), z.unknown()).nullable(),
+)
+export type SeasonStats = z.infer<typeof seasonStatsSchema>
