@@ -379,11 +379,11 @@ router.get('/live/flock-rankings', (_req, res) => {
 router.post(
   '/live/flock-rankings',
   requireAdmin,
-  express.text({ type: 'text/plain', limit: '1mb' }),
+  express.json({ limit: '2mb' }),
   (req, res) => {
-    const body = req.body as string
+    const body = (req.body as { csv?: unknown })?.csv
     if (typeof body !== 'string' || !body.trim()) {
-      res.status(400).json({ error: 'Request body must be CSV text.' })
+      res.status(400).json({ error: 'Request body must be { csv: "..." }.' })
       return
     }
     try {

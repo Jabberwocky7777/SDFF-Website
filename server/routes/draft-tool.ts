@@ -76,10 +76,14 @@ router.get('/flock-rankings', (_req, res) => {
   }
 })
 
-router.post('/flock-rankings', express.text({ type: 'text/plain', limit: '1mb' }), (req, res) => {
-  const body = req.body as string
+// JSON-wrapped rather than a raw text/plain body: text/plain is a
+// CSRF-capable content type that an HTML form can send cross-site, and
+// requiring JSON on every mutation is what lets the guard in index.ts be
+// unconditional.
+router.post('/flock-rankings', express.json({ limit: '2mb' }), (req, res) => {
+  const body = (req.body as { csv?: unknown })?.csv
   if (typeof body !== 'string' || !body.trim()) {
-    res.status(400).json({ error: 'Request body must be CSV text.' })
+    res.status(400).json({ error: 'Request body must be { csv: "..." }.' })
     return
   }
   try {

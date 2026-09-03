@@ -160,8 +160,8 @@ function CsvUploadZone({ playerCount, onUploaded }: { playerCount: number; onUpl
     try {
       const result = await apiFetch<{ success: boolean; count: number }>('/draft-tool/flock-rankings', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: preview.csv,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: preview.csv }),
       })
       localStorage.setItem(LS_FLOCK_TS, String(Date.now()))
       setUploadState('success')

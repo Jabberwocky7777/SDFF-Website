@@ -43,7 +43,7 @@ try {
   const db = getDb()
   trace('db ready')
   maybeResetAdmin(db)
-  bootstrapLeaguesIfEmpty(db)
+  await bootstrapLeaguesIfEmpty(db)
   const slugs = getLeagues(db).map((l) => l.slug)
   trace(`leagues: ${slugs.join(', ') || '(none — set up in the app)'}`)
   startScheduler()
@@ -103,6 +103,21 @@ if (dbError) {
   app.get('/{*splat}', (_req, res, next) => {
     if (_req.path.startsWith('/api/')) return next()
     res.sendFile(path.join(distPath, 'index.html'))
+  })
+
+  // CSRF: the session cookie is SameSite=Lax, which already blocks cross-site
+  // form posts. This is the second layer — an HTML form can only send
+  // urlencoded, multipart or text/plain bodies, so requiring JSON on every
+  // mutation means a cross-origin page cannot construct a request the API will
+  // accept without a preflight it can't pass.
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next()
+    const type = req.headers['content-type']?.split(';')[0].trim().toLowerCase()
+    if (type !== 'application/json') {
+      res.status(415).json({ error: 'Content-Type must be application/json' })
+      return
+    }
+    next()
   })
 
   app.use(express.json())

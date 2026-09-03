@@ -11,12 +11,15 @@ export class ApiError extends Error {
 /**
  * Fetch a JSON API route. Auth is the `sdff_session` cookie set by the login
  * flow — sent automatically on same-origin requests, so nothing to attach here.
+ *
+ * Content-Type is always JSON, including on bodyless POSTs: the server rejects
+ * any other type on a mutation as a CSRF guard.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include',
-    headers: { ...(init?.headers as Record<string, string>) },
+    headers: { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string>) },
   })
 
   if (res.status === 401) {
