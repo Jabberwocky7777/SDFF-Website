@@ -12,11 +12,23 @@ async function hubFetch<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string>) },
   })
-  if (res.status === 401) {
+
+  // Session-expiry on a route that isn't the login itself -> bounce to splash.
+  if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/setup')) {
     window.dispatchEvent(new CustomEvent('sdff:auth-failure'))
     throw new ApiError(401, 'Unauthorized')
   }
-  if (!res.ok) throw new ApiError(res.status, `API error ${res.status} for ${path}`)
+
+  if (!res.ok) {
+    let msg = `API error ${res.status}`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body?.error) msg = body.error
+    } catch {
+      /* no JSON body */
+    }
+    throw new ApiError(res.status, msg)
+  }
   return res.json() as Promise<T>
 }
 

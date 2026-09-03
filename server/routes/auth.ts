@@ -21,17 +21,27 @@ import {
 const router = Router()
 const IS_PROD = process.env.NODE_ENV === 'production'
 
-// ── naive per-IP rate limit: 8 attempts / 15 min ────────────────────────────
-const WINDOW_MS = 15 * 60 * 1000
-const MAX_ATTEMPTS = 8
+// ── naive per-IP rate limit: 30 attempts / 10 min ──────────────────────────
+const WINDOW_MS = 10 * 60 * 1000
+const MAX_ATTEMPTS = 30
 const attempts = new Map<string, number[]>()
 
+/** Records the attempt and returns true once the window is exceeded. */
 function rateLimited(ip: string): boolean {
   const now = Date.now()
   const hits = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS)
   hits.push(now)
   attempts.set(ip, hits)
-  return hits.length > MAX_ATTEMPTS
+  if (hits.length > MAX_ATTEMPTS) {
+    console.warn(`[auth] rate-limiting ${ip} (${hits.length} attempts in ${WINDOW_MS / 60000} min)`)
+    return true
+  }
+  return false
+}
+
+/** Clear an IP's attempt count on a successful login. */
+function clearAttempts(ip: string): void {
+  attempts.delete(ip)
 }
 
 // Periodic cleanup so the map doesn't grow unbounded.
@@ -47,17 +57,20 @@ setInterval(() => {
 router.post('/auth/login', (req, res) => {
   const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown'
   if (rateLimited(ip)) {
-    res.status(429).json({ error: 'too many attempts, try again later' })
+    res
+      .status(429)
+      .json({ error: 'Too many attempts. Wait a few minutes (or restart the app) and try again.' })
     return
   }
 
   const code = typeof req.body?.code === 'string' ? req.body.code : ''
   const { admin, slugs } = resolveAccessCode(code)
   if (!admin && slugs.length === 0) {
-    res.status(401).json({ error: 'invalid code' })
+    res.status(401).json({ error: "That code didn't match a league or the commissioner password." })
     return
   }
 
+  clearAttempts(ip)
   const token = signSession({ slugs, admin })
   res.cookie(SESSION_COOKIE, token, sessionCookieOptions(IS_PROD))
   res.json({ authed: true, slugs, admin })

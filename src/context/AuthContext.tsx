@@ -18,7 +18,8 @@ interface AuthContextValue {
   /** League slugs this session may view. */
   slugs: string[]
   admin: boolean
-  login: (code: string) => Promise<boolean>
+  /** Returns an error message, or null on success. */
+  login: (code: string) => Promise<string | null>
   logout: () => Promise<void>
   setup: (password: string) => Promise<string | null>
   refresh: () => Promise<void>
@@ -86,14 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(
-    async (code: string): Promise<boolean> => {
+    async (code: string): Promise<string | null> => {
       try {
         const s = await apiLogin(code)
-        if (!s.authed) return false
+        if (!s.authed) return 'Login failed.'
         await refresh()
-        return true
-      } catch {
-        return false
+        return null
+      } catch (err) {
+        return err instanceof Error && err.message ? err.message : 'Login failed.'
       }
     },
     [refresh],

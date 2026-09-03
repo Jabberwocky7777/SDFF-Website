@@ -4,17 +4,17 @@ import { useAuth } from '@/context/AuthContext'
 export default function SplashScreen() {
   const { login } = useAuth()
   const [value, setValue] = useState('')
-  const [error, setError] = useState(false)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!value.trim()) return
     setLoading(true)
-    setError(false)
-    const ok = await login(value.trim())
-    if (!ok) {
-      setError(true)
+    setError('')
+    const err = await login(value.trim())
+    if (err) {
+      setError(err)
       setValue('')
     }
     setLoading(false)
@@ -42,7 +42,7 @@ export default function SplashScreen() {
                 value={value}
                 onChange={(e) => {
                   setValue(e.target.value)
-                  setError(false)
+                  setError('')
                 }}
                 placeholder="e.g. SDFF"
                 autoFocus
@@ -54,11 +54,7 @@ export default function SplashScreen() {
                     : 'border-borderLow focus:border-border'
                 }`}
               />
-              {error && (
-                <p className="mt-1.5 text-red-400 text-small font-sans">
-                  That code didn't match a league. Try again.
-                </p>
-              )}
+              {error && <p className="mt-1.5 text-red-400 text-small font-sans">{error}</p>}
             </div>
 
             <button
