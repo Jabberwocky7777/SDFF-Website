@@ -1,5 +1,5 @@
 /**
- * Auth endpoints (PLAN.md §6.1, §6.3).
+ * Auth endpoints.
  *
  *   POST /api/auth/login   { code }  -> sets sdff_session cookie
  *   POST /api/auth/logout            -> clears it

@@ -100,8 +100,10 @@ server/
   sleeper/              rate-limited client, Zod schemas, chain walker, discovery, external sources
   sync/                 backfill queue + incremental ingest + cron scheduler + nightly backup
   analytics/            pure query functions over SQLite (unit-tested) — incl. trades.ts
-  routes/               setup, auth, admin-leagues, leagues/:slug/*, legacy proxy
+  routes/               setup, auth, admin-leagues, leagues/:slug/*, draft-tool
   auth/                 session cookie + middleware + admin password (scrypt)
+  lib/jsonFile.ts       atomic small-file storage in the cache dir
+  cache.ts              TTL cache for live upstream responses
   security.ts / log.ts  CSP + headers, structured JSON logging
 src/
   context/              Auth, Leagues, LeagueScope providers
@@ -110,7 +112,7 @@ src/
   components/ErrorBoundary.tsx
   pages/AdminSettings    league + account management + sync/backup status
   pages/hub/             Overview, Standings, History, HeadToHead, Records, Power, Managers, Trades
-  pages/                 in-league pages: Rosters, Draft, DraftGrades, Dues, Picks, Bylaws, …
+  pages/                 in-league pages: Rosters, Dues, Picks, Bylaws, Timeline, …
 ```
 
 Every route is nested under `/l/:slug/*`; live data is proxied per league via

@@ -2,7 +2,7 @@
  * Thin TTL cache wrapper around live Sleeper calls, shared by the legacy
  * single-league proxy and the new per-league routes. Volatile data (current
  * rosters, live matchups) stays on the file cache — only historical/computed
- * data goes to SQLite (PLAN.md §0).
+ * data goes to SQLite.
  */
 import type { Response } from 'express'
 import { readCache, writeCache, readStale } from '../cache.js'

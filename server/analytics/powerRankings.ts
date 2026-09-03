@@ -1,5 +1,5 @@
 /**
- * Power rankings (PLAN.md §4B) — a blended, schedule-aware strength score for
+ * Power rankings — a blended, schedule-aware strength score for
  * the most recent season with games played.
  *
  * blend = 0.45·recentForm(last 3 wk, z) + 0.30·seasonPPG(z) + 0.25·allPlayWin%

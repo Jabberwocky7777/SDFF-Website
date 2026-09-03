@@ -3,8 +3,8 @@
  *
  * Sleeper has no "give me league history" endpoint. Each season's league object
  * points backward to the prior season via `previous_league_id`. Walking that
- * chain from the current league ID until null IS the league's history
- * (PLAN.md §1). Everything in Phase 2+ depends on this.
+ * chain from the current league ID until null IS the league's history, and
+ * every sync depends on it.
  */
 import type { SleeperClient } from './client.js'
 import type { SleeperLeague } from './schemas.js'

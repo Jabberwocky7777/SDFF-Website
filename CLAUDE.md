@@ -5,7 +5,8 @@ Multi-league fantasy football hub built on the Sleeper API. React 19 + Vite +
 TypeScript frontend, Express 5 backend, SQLite (better-sqlite3) for historical
 data, file cache for live data. Deployed via Docker to TrueNAS Scale.
 
-Full design doc: `PLAN.md` in the repo root.
+The original design doc is not in the tree — see the README for current
+architecture, and git history for the planning notes it replaced.
 
 ## Current focus
 Expanding the single-league SDFF dynasty site into a multi-league hub. Two
@@ -36,8 +37,9 @@ once into the DB on a fresh install (`server/config/bootstrap.ts`), then ignored
 - Never call the Sleeper API from the frontend. All Sleeper access goes through
   the server.
 - Never fetch `/players/nfl` outside the daily sync job.
-- League IDs come from `config/leagues.json` only. Never hardcode. Always
-  validate a request's `:slug` against the config before touching Sleeper.
+- League IDs come from the `league_family` table via `server/config/leagues.ts`
+  only. Never hardcode, and never take one from the request. Always validate a
+  request's `:slug` against the registry before touching Sleeper.
 - Analytics live in `server/analytics/` as pure functions over query results,
   so they can be unit-tested without a network or DB.
 - Server is ESM (`"type": "module"`, `tsconfig.node.json` uses `NodeNext`).
@@ -54,18 +56,21 @@ npm run db:migrate       # Apply SQLite migrations
 npm run leagues:discover -- --username <sleeper_username>
 npm run sync:backfill -- --league <slug|all>
 npm run sync:incremental
-npm test                 # Vitest (once added)
+npm test                 # Vitest
+npm run typecheck        # tsc --noEmit on the frontend (vite build does not)
 ```
 
 ## Layout
 ```
-config/leagues.json        # league identity/routing/codes (gitignored, volume-mounted)
-server/config/leagues.ts   # Zod loader + LEAGUE_ID backward-compat shim
-server/db/                 # schema.sql, migrate.ts, index.ts (connection singleton)
+server/config/leagues.ts   # DB-backed league registry + access-code resolution
+server/config/bootstrap.ts # one-time import of a legacy config/leagues.json
+server/db/                 # migrations/, migrate.ts, index.ts (connection singleton)
 server/sleeper/            # rate-limited client, Zod schemas, previous_league_id walker
-server/sync/               # backfill + incremental ingest (Phase 2)
-server/analytics/          # pure query functions (Phase 4)
-server/scripts/            # one-off CLIs (discover, merge-managers)
+server/sync/               # backfill queue + incremental ingest + cron + backups
+server/analytics/          # pure query functions (unit-tested)
+server/auth/               # session cookie, middleware, scrypt admin password
+server/lib/                # shared helpers (atomic cache-file storage)
+server/scripts/            # one-off CLIs (migrate, discover, backfill)
 server/routes/             # Express routers
 src/                       # React frontend
 ```

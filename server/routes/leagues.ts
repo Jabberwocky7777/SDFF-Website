@@ -1,5 +1,5 @@
 /**
- * Namespaced per-league API (PLAN.md §3, §11.1).
+ * Namespaced per-league API.
  *
  *   GET /api/leagues/:slug                     league meta + seasons + capabilities
  *   GET /api/leagues/:slug/standings?season=   career or single-season table

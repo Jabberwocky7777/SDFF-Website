@@ -1,5 +1,5 @@
 /**
- * Derive final league placement from the playoff brackets (PLAN.md §2, §7).
+ * Derive final league placement from the playoff brackets.
  *
  * `final_rank` is NOT given by Sleeper directly. The winners bracket decides
  * places 1..2k; the losers/toilet bracket decides the bottom places. Each

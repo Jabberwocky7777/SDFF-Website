@@ -1,5 +1,5 @@
 /**
- * All-play & luck metrics (PLAN.md §4A, §12.3) — the schedule-independent view.
+ * All-play & luck metrics — the schedule-independent view.
  *
  * Each week, a team is compared against *every other* team that played that
  * week, not just its actual opponent. That yields:

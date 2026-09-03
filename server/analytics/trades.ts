@@ -1,5 +1,5 @@
 /**
- * Trade tracker (PLAN.md §13) — pure read layer over the ingested trade,
+ * Trade tracker — pure read layer over the ingested trade,
  * weekly-roster and draft data. No network, no Sleeper, unit-testable.
  *
  * The key idea (§13.1): `player_week_roster` already holds who rostered whom

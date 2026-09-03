@@ -1,6 +1,6 @@
 -- SDFF multi-league hub — SQLite schema (baseline, migration 001).
 -- Historical + computed data lives here. Live/volatile data stays on the file cache.
--- See PLAN.md §2, §11.2, §13.2.
+-- See, §11.2, §13.2.
 --
 -- Conventions:
 --   * All Sleeper IDs are stored as TEXT (they are 64-bit snowflakes).
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS league_season (
   scoring_settings_json TEXT,
   roster_positions_json TEXT,
   settings_json         TEXT,
-  capabilities_json     TEXT,               -- derived LeagueCapabilities (PLAN.md §11.2)
+  capabilities_json     TEXT,               -- derived LeagueCapabilities
   raw_json              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_league_season_family_season ON league_season(family_id, season);
@@ -86,14 +86,14 @@ CREATE TABLE IF NOT EXISTS matchup (
   starters_points_json TEXT,
   players_json         TEXT,
   players_points_json  TEXT,
-  optimal_points       REAL,                -- computed (PLAN.md §4 coaching efficiency)
+  optimal_points       REAL,                -- computed
   PRIMARY KEY (league_id, week, roster_id)
 );
 CREATE INDEX IF NOT EXISTS idx_matchup_user ON matchup(user_id);
 CREATE INDEX IF NOT EXISTS idx_matchup_league_week ON matchup(league_id, week);
 CREATE INDEX IF NOT EXISTS idx_matchup_opponent_user ON matchup(opponent_user_id);
 
--- Flattened weekly roster snapshot with per-player scoring (PLAN.md §13.1).
+-- Flattened weekly roster snapshot with per-player scoring.
 -- Powers trade attribution, bench-points leaderboards, coaching efficiency.
 CREATE TABLE IF NOT EXISTS player_week_roster (
   league_id TEXT NOT NULL REFERENCES league_season(league_id) ON DELETE CASCADE,
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS transaction_record (
 CREATE INDEX IF NOT EXISTS idx_txn_league_week ON transaction_record(league_id, week);
 CREATE INDEX IF NOT EXISTS idx_txn_type ON transaction_record(type);
 
--- Trades, normalized for N-team support (PLAN.md §13.2).
+-- Trades, normalized for N-team support.
 CREATE TABLE IF NOT EXISTS trade (
   id              TEXT PRIMARY KEY,         -- Sleeper transaction_id
   league_id       TEXT NOT NULL REFERENCES league_season(league_id) ON DELETE CASCADE,
@@ -193,7 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_draft_pick_league ON draft_pick(league_id);
 CREATE INDEX IF NOT EXISTS idx_draft_pick_player ON draft_pick(player_id);
 
 -- Raw traded-pick ownership per league-season (GET /league/{id}/traded_picks).
--- Feeds trade-tree pick resolution (PLAN.md §13.4).
+-- Feeds trade-tree pick resolution.
 CREATE TABLE IF NOT EXISTS traded_pick (
   league_id                TEXT NOT NULL REFERENCES league_season(league_id) ON DELETE CASCADE,
   pick_season              TEXT NOT NULL,
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS traded_pick (
   PRIMARY KEY (league_id, pick_season, round, original_roster_id)
 );
 
--- Auto-computed season awards (PLAN.md §12.5). Trophy case on manager profiles.
+-- Auto-computed season awards. Trophy case on manager profiles.
 CREATE TABLE IF NOT EXISTS award (
   id         INTEGER PRIMARY KEY,
   family_id  INTEGER NOT NULL REFERENCES league_family(id) ON DELETE CASCADE,
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS player (
   updated_at INTEGER
 );
 
--- Sync bookkeeping — makes backfill resumable (PLAN.md §2, §5 Phase 2).
+-- Sync bookkeeping — makes backfill resumable.
 CREATE TABLE IF NOT EXISTS sync_log (
   id              INTEGER PRIMARY KEY,
   league_id       TEXT,

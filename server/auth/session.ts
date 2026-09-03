@@ -1,5 +1,5 @@
 /**
- * Signed-cookie sessions (PLAN.md §6.1).
+ * Signed-cookie sessions.
  *
  * A session records which league slugs the visitor unlocked (by entering an
  * access code) and whether they are an admin. It is an HMAC-signed,

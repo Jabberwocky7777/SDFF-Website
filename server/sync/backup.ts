@@ -1,5 +1,5 @@
 /**
- * Nightly SQLite backup (PLAN.md §7). `VACUUM INTO` writes a clean, defragmented
+ * Nightly SQLite backup. `VACUUM INTO` writes a clean, defragmented
  * copy of the database to `<cacheDir>/backups/sdff-YYYY-MM-DD.db` — safe to run
  * on a live connection. Keeps the most recent BACKUP_KEEP files (default 7).
  *

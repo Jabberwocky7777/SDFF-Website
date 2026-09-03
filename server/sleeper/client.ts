@@ -2,7 +2,7 @@
  * Typed, rate-limited Sleeper API client.
  *
  * Sleeper is read-only, unauthenticated, and asks clients to stay under
- * ~1000 requests/minute (PLAN.md §0). This client enforces a token-bucket
+ * ~1000 requests/minute. This client enforces a token-bucket
  * ceiling well below that, retries 429/5xx with exponential backoff + jitter,
  * and validates responses with the schemas in ./schemas.ts.
  */
@@ -267,8 +267,8 @@ export class SleeperClient {
   }
 
   /**
-   * The ~5MB player dictionary. Fetch once per day, globally — never per request
-   * (PLAN.md §1, §7). Not validated per-entry for size reasons; caller decides.
+   * The ~5MB player dictionary. Fetch once per day, globally — never per
+   * request. Not validated per-entry for size reasons; caller decides.
    */
   async getAllPlayers(): Promise<Record<string, SleeperPlayer>> {
     const raw = await this.request('/players/nfl')

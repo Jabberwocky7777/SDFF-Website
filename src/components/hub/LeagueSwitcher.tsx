@@ -4,8 +4,8 @@ import { useLeagues } from '@/context/LeaguesContext'
 import { useAuth } from '@/context/AuthContext'
 
 /**
- * Switches the `:slug` segment while keeping the current sub-route
- * (PLAN.md §11.1). `/l/sdff/records` -> pick "athens" -> `/l/athens/records`.
+ * Switches the `:slug` segment while keeping the current sub-route:
+ * `/l/sdff/records` -> pick "athens" -> `/l/athens/records`.
  */
 export default function LeagueSwitcher({ currentSlug }: { currentSlug: string }) {
   const { leagues } = useLeagues()

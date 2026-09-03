@@ -1,9 +1,9 @@
 /**
  * Ingest orchestration — walk the Sleeper API for a league family, normalize,
- * and persist to SQLite (PLAN.md §5 Phase 2).
+ * and persist to SQLite.
  *
  * All writes are idempotent upserts, so any sync is safe to re-run. Progress is
- * recorded in `sync_log`. Gotchas from PLAN.md §7 are handled inline and
+ * recorded in `sync_log`. Sleeper's historical quirks are handled inline and
  * flagged with `// GOTCHA:` comments.
  */
 import type { DB } from '../db/index.js'
@@ -40,7 +40,7 @@ import type {
 } from '../sleeper/schemas.js'
 
 const MAX_NFL_WEEK = 18
-const PLAYERS_TTL_MS = 20 * 60 * 60 * 1000 // refresh at most ~once/day (PLAN.md §7)
+const PLAYERS_TTL_MS = 20 * 60 * 60 * 1000 // refresh at most ~once/day
 
 export interface IngestOptions {
   /** 'backfill' pulls every season; 'incremental' only the current one. */
@@ -190,7 +190,7 @@ function normalizeWeek(
       playersPointsJson: m.players_points ? JSON.stringify(m.players_points) : null,
     })
 
-    // Flatten weekly roster snapshot (PLAN.md §13.1).
+    // Flatten weekly roster snapshot.
     const starters = new Set(m.starters ?? [])
     const pts = m.players_points ?? {}
     for (const pid of m.players ?? []) {
@@ -552,7 +552,7 @@ export async function ingestFamily(
 
     const familyId = entry.id
 
-    // Manager aliases (admin-managed, PLAN.md §7) — applied before ingest so
+    // Manager aliases (admin-managed) — applied before ingest so
     // resolveManager() collapses merged identities everywhere.
     applyManagerAliases(db)
 

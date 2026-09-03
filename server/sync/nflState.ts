@@ -1,5 +1,5 @@
 /**
- * Resolve "what week is it" — drives every sync (PLAN.md §1 GET /state/nfl).
+ * Resolve "what week is it" — drives every sync.
  * Falls back to a sane default if Sleeper is unreachable.
  */
 import type { SleeperClient } from '../sleeper/client.js'

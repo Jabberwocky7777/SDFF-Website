@@ -7,7 +7,7 @@
  * routing, auth and sync. A small in-memory cache is invalidated on every write.
  *
  * Always validate an incoming `:slug` against this registry before touching the
- * Sleeper API (PLAN.md §6.7).
+ * Sleeper API.
  */
 import crypto from 'node:crypto'
 import { getDb, type DB } from '../db/index.js'

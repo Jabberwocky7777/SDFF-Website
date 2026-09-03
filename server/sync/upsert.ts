@@ -1,6 +1,6 @@
 /**
  * Idempotent DB writers. Every function is a plain upsert so a sync can be
- * re-run safely (PLAN.md §5 Phase 2). No business logic here — callers pass
+ * re-run safely. No business logic here — callers pass
  * already-normalized rows.
  */
 import type { DB } from '../db/index.js'

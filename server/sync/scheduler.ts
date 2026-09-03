@@ -1,5 +1,5 @@
 /**
- * In-process sync scheduler (PLAN.md §5 Phase 2).
+ * In-process sync scheduler.
  *
  * Incremental sync runs hourly, plus every 15 min on game days (Thu/Sun/Mon).
  * A full backfill is never scheduled — run `npm run sync:backfill` by hand or

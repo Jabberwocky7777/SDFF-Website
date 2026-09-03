@@ -1,5 +1,5 @@
 /**
- * Auth middleware (PLAN.md §6).
+ * Auth middleware.
  *
  * Authentication is a single signed `sdff_session` cookie, set by
  * `POST /api/auth/login` when the visitor enters a league access code (or the
@@ -47,7 +47,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
 /**
  * For `/api/leagues/:slug/...` — 404 for an unknown slug (never a Sleeper call
- * for an arbitrary id, PLAN.md §6.7), 403 if the session can't read it.
+ * for an arbitrary id), 403 if the session can't read it.
  */
 export function requireLeagueAccess(req: Request, res: Response, next: NextFunction): void {
   const slug = String((req.params as Record<string, string>).slug)

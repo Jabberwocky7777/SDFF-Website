@@ -3,7 +3,7 @@
  *
  * Philosophy: validate the fields we actually read, stay `.loose()` so Sleeper
  * adding fields never breaks us, and keep the raw payload around for storage.
- * See PLAN.md §1 for the endpoint reference.
+ * Endpoint shapes are documented at https://docs.sleeper.com.
  */
 import { z } from 'zod'
 

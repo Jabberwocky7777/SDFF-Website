@@ -1,6 +1,6 @@
 /**
  * Read layer over the ingested SQLite data. Pure functions of a DB handle —
- * no network, no Sleeper, unit-testable with a fixture DB (PLAN.md §3, §5).
+ * no network, no Sleeper, unit-testable with a fixture DB.
  *
  * Everything here is scoped to a single league *family* (by slug). Cross-league
  * aggregation is deliberately not built yet (leagues stay siloed).

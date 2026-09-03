@@ -1,5 +1,5 @@
 /**
- * Security response headers (PLAN.md §6). Applied to every response — static
+ * Security response headers. Applied to every response — static
  * assets, the SPA document and the API alike.
  *
  * The app is fully self-hosted: the only third-party origins it touches are

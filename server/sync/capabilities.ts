@@ -1,5 +1,5 @@
 /**
- * Derive a per-league-season capability object (PLAN.md §11.2).
+ * Derive a per-league-season capability object.
  *
  * Nav and page availability are computed from these flags — never from
  * `league.type === 'dynasty'` conditionals scattered through components.
