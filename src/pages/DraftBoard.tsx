@@ -38,6 +38,7 @@ const POSITIONS: Position[] = ['QB', 'RB', 'WR', 'TE']
 const LS_LIVE     = 'sdff_live_draft_id'
 const LS_FLOCK_TS = 'sdff_flock_updated_at'
 const LS_ROSTER   = 'sdff_my_roster_id'
+const LS_DYNASTY  = 'sdff_draft_dynasty'
 
 type View     = 'available' | 'board' | 'drafted' | 'mine'
 type PosFilter = 'ALL' | Position
@@ -243,6 +244,12 @@ export default function DraftBoard() {
   const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('desc')
   const [search,      setSearch]      = useState('')
   const [needsToggle, setNeedsToggle] = useState(false)
+  // The rebuild / balanced / win-now badges read a player's age against his
+  // position's aging curve — useful for a dynasty draft, noise in a redraft
+  // one, where every pick is for this season only. Off unless asked for.
+  const [dynastyMode, setDynastyMode] = useState(
+    () => localStorage.getItem(LS_DYNASTY) === '1',
+  )
 
   const { players, recentPicks, currentPickNo, draftStatus, totalPicks, lastRefresh, isLoading, isFetching, error, refresh, reloadFlockRankings } =
     useDraftData({ liveDraftId })
@@ -500,6 +507,22 @@ export default function DraftBoard() {
               )}
             </div>
           </div>
+          <label className="flex items-center gap-2 mt-4 cursor-pointer w-fit">
+            <input
+              type="checkbox"
+              checked={dynastyMode}
+              onChange={(e) => {
+                setDynastyMode(e.target.checked)
+                localStorage.setItem(LS_DYNASTY, e.target.checked ? '1' : '0')
+              }}
+              className="accent-gold"
+            />
+            <span className="text-small text-text">Dynasty age badges</span>
+            <span className="text-label text-mutedLow">
+              rebuild / balanced / win-now, by age — leave off for redraft
+            </span>
+          </label>
+
           <CsvUploadZone playerCount={players.length} onUploaded={reloadFlockRankings} />
         </div>
       )}
@@ -708,9 +731,11 @@ export default function DraftBoard() {
                           title={p.name}>
                           {namePrefix}{p.name}
                         </span>
-                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                          {p.dynastyProfile && <ProfileBadge profile={p.dynastyProfile} />}
-                        </div>
+                        {dynastyMode && p.dynastyProfile && (
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            <ProfileBadge profile={p.dynastyProfile} />
+                          </div>
+                        )}
                       </td>
                       {/* Tier — always visible */}
                       <td className="px-3 py-2 text-center">
@@ -813,7 +838,7 @@ export default function DraftBoard() {
                       {flockEntry && (
                         <div className="text-label text-mutedLow">
                           Flock #{flockEntry.flockRank}
-                          {flockEntry.dynastyProfile && (
+                          {dynastyMode && flockEntry.dynastyProfile && (
                             <span className="ml-1.5"><ProfileBadge profile={flockEntry.dynastyProfile} /></span>
                           )}
                         </div>

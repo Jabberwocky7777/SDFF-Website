@@ -320,7 +320,7 @@ router.get('/live/draft/:draftId/picks', (req, res) => {
     res.status(400).json({ error: 'bad draft id' })
     return
   }
-  void serveCached(res, `draft_picks_${draftId}`, `/draft/${draftId}/picks`, 15)
+  void serveCached(res, `draft_picks_${draftId}`, `/draft/${draftId}/picks`, 3)
 })
 
 // ── Global references (not league-specific, but gated behind league access) ──

@@ -33,7 +33,9 @@ router.get('/draft/:draftId/picks', (req, res) => {
     res.status(400).json({ error: 'bad draft id' })
     return
   }
-  void serveCached(res, `draft_picks_${draftId}`, `/draft/${draftId}/picks`, 15)
+  // 3s: short enough that a board polling every 5s is never showing a pick
+  // that landed two picks ago, long enough to absorb a page full of clients.
+  void serveCached(res, `draft_picks_${draftId}`, `/draft/${draftId}/picks`, 3)
 })
 
 router.get('/fantasycalc-rankings', (_req, res) => {

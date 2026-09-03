@@ -21,12 +21,29 @@ const POS_TONE: Record<string, string> = {
 type Density = 'comfortable' | 'compact'
 const DENSITY_KEY = 'sdff_draft_density'
 
-function loadDensity(): Density {
+/**
+ * What one column actually costs, per density, in px. Comfortable is
+ * content-sized, so this is measured rather than derived from `min-w`; compact
+ * uses a fixed table layout and holds this width exactly.
+ */
+const COL_PX: Record<Density, number> = { comfortable: 158, compact: 104 }
+const ROUND_COL_PX = 45
+
+/**
+ * Remembered choice wins. With no choice on record, start in whichever density
+ * actually fits the whole board on this screen — the point of the board is
+ * seeing every team at once, and 12 teams at comfortable width needs ~1900px.
+ */
+function loadDensity(teams: number): Density {
   try {
-    return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'
+    const saved = localStorage.getItem(DENSITY_KEY)
+    if (saved === 'compact' || saved === 'comfortable') return saved
   } catch {
-    return 'comfortable'
+    /* private mode — fall through to the fitted default */
   }
+  if (typeof window === 'undefined' || !teams) return 'comfortable'
+  const available = window.innerWidth - ROUND_COL_PX
+  return teams * COL_PX.comfortable <= available ? 'comfortable' : 'compact'
 }
 
 /**
@@ -64,8 +81,8 @@ function Cell({ pick, density }: { pick: DraftPickView | undefined; density: Den
   const first = pick.playerName?.split(' ')[0] ?? ''
   return (
     <td
-      className={`border border-borderLow/40 align-top ${
-        compact ? 'px-1.5 py-0.5 min-w-[7rem]' : 'px-2 py-1.5 min-w-[9.5rem]'
+      className={`border border-borderLow/40 align-top overflow-hidden ${
+        compact ? 'px-1.5 py-0.5 min-w-[6.5rem]' : 'px-2 py-1.5 min-w-[9.5rem]'
       }`}
       title={compact ? finishTitle(pick) : undefined}
     >
@@ -138,10 +155,11 @@ function Toggle({
 export default function HubDrafts() {
   const { slug, meta } = useHub()
   const [season, setSeason] = useState<number | null>(null)
-  const [density, setDensity] = useState<Density>(loadDensity)
+  const [density, setDensity] = useState<Density | null>(null)
   const board_ = useFullscreen<HTMLDivElement>()
 
   useEffect(() => {
+    if (!density) return
     try {
       localStorage.setItem(DENSITY_KEY, density)
     } catch {
@@ -171,6 +189,12 @@ export default function HubDrafts() {
     )
   }, [board.data])
 
+  // An explicit choice wins; otherwise fit to this screen once the board tells
+  // us how many teams there are. Derived rather than stored, so it stays right
+  // when the window resizes before the user has picked.
+  const teams = board.data?.slots.length ?? 0
+  const effectiveDensity: Density = density ?? (teams ? loadDensity(teams) : 'comfortable')
+
   if (seasons.isLoading) return <SkeletonLoader rows={8} />
   if (!seasons.data || seasons.data.length === 0) {
     return <EmptyState>No draft results on record for {meta.displayName} yet.</EmptyState>
@@ -187,10 +211,10 @@ export default function HubDrafts() {
         </p>
         <div className="flex items-center gap-2">
           <div className="flex gap-1 bg-surfaceHi border border-borderLow rounded-lg p-1">
-            <Toggle active={density === 'comfortable'} onClick={() => setDensity('comfortable')}>
+            <Toggle active={effectiveDensity === 'comfortable'} onClick={() => setDensity('comfortable')}>
               Comfortable
             </Toggle>
-            <Toggle active={density === 'compact'} onClick={() => setDensity('compact')}>
+            <Toggle active={effectiveDensity === 'compact'} onClick={() => setDensity('compact')}>
               Compact
             </Toggle>
           </div>
@@ -218,7 +242,7 @@ export default function HubDrafts() {
           {/* Board (sm and up). Full-bleed so 12 columns fit without panning,
               with both axes pinned so the round number and the team never
               scroll out from under you. */}
-          <div className="hidden sm:block bleed px-4 sm:px-6 lg:px-8">
+          <div className="hidden sm:block">
             {/* The toolbar button is covered while the overlay is up, so the
                 overlay carries its own way out. */}
             {board_.active && (
@@ -229,62 +253,59 @@ export default function HubDrafts() {
                 Exit fullscreen · Esc
               </button>
             )}
-            <div className="flex gap-4 items-start">
-              <ScrollTable
-                frameRef={board_.ref}
-                maxHeight={board_.active ? '100vh' : 'calc(100vh - 17rem)'}
-                className={`flex-1 min-w-0 ${
-                  board_.expanded ? 'fixed inset-0 z-50 rounded-none' : ''
+            <ScrollTable
+              bleed={!board_.active}
+              frameRef={board_.ref}
+              maxHeight={board_.active ? '100vh' : 'calc(100vh - 17rem)'}
+              className={board_.expanded ? 'fixed inset-0 z-50 rounded-none' : ''}
+            >
+              <table
+                className={`border-collapse text-left ${
+                  effectiveDensity === 'compact' ? 'table-fixed w-full' : ''
                 }`}
               >
-                <table className="border-collapse text-left">
-                  <thead>
-                    <tr>
-                      <th className="sticky left-0 top-0 z-30 bg-surface px-3 py-2 text-label text-mutedLow uppercase">
-                        Rd
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 top-0 z-30 bg-surface px-3 py-2 text-label text-mutedLow uppercase">
+                      Rd
+                    </th>
+                    {board.data.slots.map((s) => (
+                      <th
+                        key={s.slot}
+                        className="sticky top-0 z-20 bg-surface px-2 py-2 text-label font-semibold text-muted truncate max-w-[9rem]"
+                        title={s.name}
+                      >
+                        {s.name}
                       </th>
-                      {board.data.slots.map((s) => (
-                        <th
-                          key={s.slot}
-                          className="sticky top-0 z-20 bg-surface px-2 py-2 text-label font-semibold text-muted truncate max-w-[9rem]"
-                          title={s.name}
-                        >
-                          {s.name}
-                        </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grid.map((row, r) => (
+                    <tr key={r}>
+                      <th className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-num font-mono text-mutedLow tabular">
+                        {r + 1}
+                      </th>
+                      {row.map((pick, c) => (
+                        <Cell key={c} pick={pick} density={effectiveDensity} />
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {grid.map((row, r) => (
-                      <tr key={r}>
-                        <th className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-num font-mono text-mutedLow tabular">
-                          {r + 1}
-                        </th>
-                        {row.map((pick, c) => (
-                          <Cell key={c} pick={pick} density={density} />
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollTable>
-
-              {/* Wide screens get the value read-out beside the board; narrower
-                  ones get it underneath. */}
-              {!board_.active && (
-                <aside className="hidden xl:block w-80 shrink-0">
-                  <DraftValuePanels
-                    picks={board.data.picks}
-                    seasonGames={board.data.seasonGames}
-                  />
-                </aside>
-              )}
-            </div>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollTable>
           </div>
 
+          {/* Underneath rather than beside the board: a side rail stole ~340px
+              and pushed the board back into horizontal scrolling, which is the
+              thing the full-bleed layout exists to avoid. */}
           {!board_.active && (
-            <div className="xl:hidden mt-6">
-              <DraftValuePanels picks={board.data.picks} seasonGames={board.data.seasonGames} />
+            <div className="mt-6">
+              <DraftValuePanels
+                picks={board.data.picks}
+                seasonGames={board.data.seasonGames}
+                layout="row"
+              />
             </div>
           )}
 

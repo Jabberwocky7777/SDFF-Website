@@ -108,10 +108,13 @@ export default function DraftValuePanels({
   picks,
   seasonGames,
   count = 10,
+  layout = 'stack',
 }: {
   picks: DraftPickView[]
   seasonGames: number | null
   count?: number
+  /** 'row' puts the two panels side by side — for sitting under a wide board. */
+  layout?: 'stack' | 'row'
 }) {
   const { worst, best } = useMemo(() => {
     const ranked = rank(picks, seasonGames)
@@ -137,7 +140,7 @@ export default function DraftValuePanels({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={layout === 'row' ? 'grid gap-4 lg:grid-cols-2 items-start' : 'space-y-4'}>
       {worst.length > 0 && (
         <Panel
           title="Worst picks"

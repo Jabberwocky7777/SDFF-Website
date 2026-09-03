@@ -92,8 +92,18 @@ async function apiTextFetch(path: string): Promise<string> {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-/** How often live pick data is re-fetched. The board's countdown reads this too. */
-export const DEFAULT_POLL_INTERVAL_MS = 30_000
+/**
+ * How often live pick data is re-fetched. The board's countdown reads this too.
+ *
+ * Tuned for being on the clock: 30s of polling on top of a 15s server cache
+ * meant a pick could take ~45s to show up, which is most of a one-minute timer.
+ * 5s against a 3s cache puts the worst case under 10s. It is one request per
+ * interval for one draft, well inside Sleeper's limits.
+ */
+export const DEFAULT_POLL_INTERVAL_MS = 5_000
+
+/** Mirrors the server's cache TTL for `/draft/:id/picks`. */
+const LIVE_PICKS_TTL_MS = 3_000
 
 interface UseDraftDataOptions {
   liveDraftId: string
@@ -139,17 +149,20 @@ export function useDraftData({
   const liveMetaQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'meta'],
     queryFn: () => apiFetch<SleeperDraftMeta>(`/draft-tool/draft/${liveDraftId}`),
-    staleTime: 30_000,
-    refetchInterval: pollIntervalMs,
+    // Draft settings barely change; only the picks need to be quick.
+    staleTime: 5 * 60_000,
+    refetchInterval: 60_000,
     enabled: !!liveDraftId,
   })
 
-  // Live draft picks (15s TTL — matches server cache so manual refresh always gets fresh data)
+  // Live draft picks. staleTime matches the server cache so a manual refresh
+  // always reaches Sleeper rather than being served a fresh-enough local copy.
   const livePicksQuery = useQuery({
     queryKey: ['draft', liveDraftId, 'picks'],
     queryFn: () => apiFetch<SleeperDraftPick[]>(`/draft-tool/draft/${liveDraftId}/picks`),
-    staleTime: 15_000,
+    staleTime: LIVE_PICKS_TTL_MS,
     refetchInterval: pollIntervalMs,
+    refetchIntervalInBackground: false,
     enabled: !!liveDraftId,
   })
 

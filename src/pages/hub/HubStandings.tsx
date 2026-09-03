@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
-import { getStandings } from '@/api/hub'
+import { getBracketSeasons, getSeasonBracket, getStandings } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
 import ScrollTable from './ScrollTable'
 import SeasonPills from './SeasonPills'
+import PlayoffBracket from './PlayoffBracket'
+import { Panel } from './shared'
 import { fmtRecord } from '@/lib/formatters'
 
 export default function HubStandings() {
@@ -19,6 +21,19 @@ export default function HubStandings() {
   })
 
   const allTime = season === 'all'
+
+  // A season's playoff bracket belongs next to that season's table — it is the
+  // other half of "how did this year go".
+  const bracketSeasons = useQuery({
+    queryKey: ['hub', slug, 'bracket-seasons'],
+    queryFn: () => getBracketSeasons(slug),
+  })
+  const hasBracket = !allTime && (bracketSeasons.data?.includes(season) ?? false)
+  const bracket = useQuery({
+    queryKey: ['hub', slug, 'bracket', season],
+    queryFn: () => getSeasonBracket(slug, season as number),
+    enabled: hasBracket,
+  })
 
   return (
     <div>
@@ -85,6 +100,18 @@ export default function HubStandings() {
               </tbody>
           </table>
         </ScrollTable>
+      )}
+
+      {hasBracket && bracket.data && (
+        <Panel title={`${season} playoffs`} className="mt-8">
+          <div className="p-5">
+            <PlayoffBracket
+              winners={bracket.data.winners}
+              losers={bracket.data.losers}
+              slug={slug}
+            />
+          </div>
+        </Panel>
       )}
     </div>
   )
