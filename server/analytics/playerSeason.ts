@@ -85,6 +85,8 @@ export interface PositionalFinish {
   posRank: number
   points: number
   position: string
+  /** Games he actually appeared in. Null when Sleeper reported no `gp`. */
+  games: number | null
 }
 
 /** Stored finishes for one family-season, keyed by player id. */
@@ -95,7 +97,7 @@ export function getPositionalFinishes(
 ): Map<string, PositionalFinish> {
   const rows = db
     .prepare(
-      `SELECT player_id, position, points, pos_rank
+      `SELECT player_id, position, points, pos_rank, games
        FROM player_season_scoring
        WHERE family_id = ? AND season = ?`,
     )
@@ -104,12 +106,46 @@ export function getPositionalFinishes(
     position: string | null
     points: number
     pos_rank: number
+    games: number | null
   }>
 
   const out = new Map<string, PositionalFinish>()
   for (const r of rows) {
     if (!r.position) continue
-    out.set(r.player_id, { posRank: r.pos_rank, points: r.points, position: r.position })
+    out.set(r.player_id, {
+      posRank: r.pos_rank,
+      points: r.points,
+      position: r.position,
+      games: r.games,
+    })
   }
   return out
+}
+
+/**
+ * How long the season ran, in games, for this family-season — the denominator
+ * for "played 4 of 17".
+ *
+ * The 90th percentile rather than the max: a player traded mid-season can
+ * appear in 18 team games, which would make every healthy starter look like he
+ * missed one. Not the median either — most ranked players are backups, so the
+ * middle of the distribution is nowhere near a full season.
+ */
+export function getSeasonGames(db: DB, familyId: number, season: number): number | null {
+  const total = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM player_season_scoring
+       WHERE family_id = ? AND season = ? AND games IS NOT NULL`,
+    )
+    .get(familyId, season) as { n: number }
+  if (!total || total.n === 0) return null
+
+  const row = db
+    .prepare(
+      `SELECT games FROM player_season_scoring
+       WHERE family_id = ? AND season = ? AND games IS NOT NULL
+       ORDER BY games LIMIT 1 OFFSET ?`,
+    )
+    .get(familyId, season, Math.floor(total.n * 0.9)) as { games: number | null } | undefined
+  return row?.games ?? null
 }

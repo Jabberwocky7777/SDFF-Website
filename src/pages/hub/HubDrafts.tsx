@@ -6,6 +6,7 @@ import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
 import ScrollTable from './ScrollTable'
 import SeasonPills from './SeasonPills'
+import DraftValuePanels from './DraftValuePanels'
 import { useFullscreen } from '@/hooks/useFullscreen'
 
 const POS_TONE: Record<string, string> = {
@@ -217,7 +218,7 @@ export default function HubDrafts() {
           {/* Board (sm and up). Full-bleed so 12 columns fit without panning,
               with both axes pinned so the round number and the team never
               scroll out from under you. */}
-          <div className="hidden sm:block">
+          <div className="hidden sm:block bleed px-4 sm:px-6 lg:px-8">
             {/* The toolbar button is covered while the overlay is up, so the
                 overlay carries its own way out. */}
             {board_.active && (
@@ -228,44 +229,64 @@ export default function HubDrafts() {
                 Exit fullscreen · Esc
               </button>
             )}
-            <ScrollTable
-              bleed={!board_.active}
-              frameRef={board_.ref}
-              maxHeight={board_.active ? '100vh' : 'calc(100vh - 17rem)'}
-              className={board_.expanded ? 'fixed inset-0 z-50 rounded-none' : ''}
-            >
-              <table className="border-collapse text-left">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 top-0 z-30 bg-surface px-3 py-2 text-label text-mutedLow uppercase">
-                      Rd
-                    </th>
-                    {board.data.slots.map((s) => (
-                      <th
-                        key={s.slot}
-                        className="sticky top-0 z-20 bg-surface px-2 py-2 text-label font-semibold text-muted truncate max-w-[9rem]"
-                        title={s.name}
-                      >
-                        {s.name}
+            <div className="flex gap-4 items-start">
+              <ScrollTable
+                frameRef={board_.ref}
+                maxHeight={board_.active ? '100vh' : 'calc(100vh - 17rem)'}
+                className={`flex-1 min-w-0 ${
+                  board_.expanded ? 'fixed inset-0 z-50 rounded-none' : ''
+                }`}
+              >
+                <table className="border-collapse text-left">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 top-0 z-30 bg-surface px-3 py-2 text-label text-mutedLow uppercase">
+                        Rd
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {grid.map((row, r) => (
-                    <tr key={r}>
-                      <th className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-num font-mono text-mutedLow tabular">
-                        {r + 1}
-                      </th>
-                      {row.map((pick, c) => (
-                        <Cell key={c} pick={pick} density={density} />
+                      {board.data.slots.map((s) => (
+                        <th
+                          key={s.slot}
+                          className="sticky top-0 z-20 bg-surface px-2 py-2 text-label font-semibold text-muted truncate max-w-[9rem]"
+                          title={s.name}
+                        >
+                          {s.name}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollTable>
+                  </thead>
+                  <tbody>
+                    {grid.map((row, r) => (
+                      <tr key={r}>
+                        <th className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-num font-mono text-mutedLow tabular">
+                          {r + 1}
+                        </th>
+                        {row.map((pick, c) => (
+                          <Cell key={c} pick={pick} density={density} />
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollTable>
+
+              {/* Wide screens get the value read-out beside the board; narrower
+                  ones get it underneath. */}
+              {!board_.active && (
+                <aside className="hidden xl:block w-80 shrink-0">
+                  <DraftValuePanels
+                    picks={board.data.picks}
+                    seasonGames={board.data.seasonGames}
+                  />
+                </aside>
+              )}
+            </div>
           </div>
+
+          {!board_.active && (
+            <div className="xl:hidden mt-6">
+              <DraftValuePanels picks={board.data.picks} seasonGames={board.data.seasonGames} />
+            </div>
+          )}
 
           {/* Below sm, panning an 1800px grid is miserable — read it by round. */}
           <div className="sm:hidden space-y-4">

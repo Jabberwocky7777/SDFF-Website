@@ -7,7 +7,7 @@
  */
 import type { DB } from '../db/index.js'
 import { getFamily } from './queries.js'
-import { getPositionalFinishes } from './playerSeason.js'
+import { getPositionalFinishes, getSeasonGames } from './playerSeason.js'
 
 export interface DraftSlot {
   slot: number
@@ -42,11 +42,15 @@ export interface DraftPickView {
   seasonPoints: number | null
   /** How many players at this position were taken before him in this draft. */
   posDraftOrder: number | null
+  /** Games he appeared in that season — context for a finish that cratered. */
+  games: number | null
 }
 
 export interface DraftBoardView extends DraftSeasonSummary {
   slots: DraftSlot[]
   picks: DraftPickView[]
+  /** Games in a full season, so a pick's `games` can be read as "6 of 17". */
+  seasonGames: number | null
 }
 
 interface RawPick {
@@ -195,6 +199,7 @@ export function getDraftBoard(db: DB, slug: string, season: number): DraftBoardV
       posRank: finish?.posRank ?? null,
       seasonPoints: finish?.points ?? null,
       posDraftOrder,
+      games: finish?.games ?? null,
     }
   })
 
@@ -208,5 +213,6 @@ export function getDraftBoard(db: DB, slug: string, season: number): DraftBoardV
     totalPicks: picks.length,
     slots,
     picks: pickViews,
+    seasonGames: getSeasonGames(db, family.id, season),
   }
 }

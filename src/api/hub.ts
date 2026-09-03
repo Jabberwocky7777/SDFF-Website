@@ -486,11 +486,15 @@ export interface DraftPickView {
   seasonPoints: number | null
   /** How many players at this position were taken before him in this draft. */
   posDraftOrder: number | null
+  /** Games he appeared in that season — context for a finish that cratered. */
+  games: number | null
 }
 
 export interface DraftBoardView extends DraftSeasonSummary {
   slots: DraftSlot[]
   picks: DraftPickView[]
+  /** Games in a full season, so a pick's `games` can be read as "6 of 17". */
+  seasonGames: number | null
 }
 
 export const getDraftSeasons = (slug: string) =>
