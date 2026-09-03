@@ -42,6 +42,10 @@ once into the DB on a fresh install (`server/config/bootstrap.ts`), then ignored
   request's `:slug` against the registry before touching Sleeper.
 - Analytics live in `server/analytics/` as pure functions over query results,
   so they can be unit-tested without a network or DB.
+- A Sleeper `roster_id` is only meaningful within one league-season. Map roster
+  -> manager by joining `team_season` on that same `league_id`; never carry a
+  roster id across seasons (managers swap slots, and Sleeper reports a past
+  league's roster owner as whoever holds it now).
 - Server is ESM (`"type": "module"`, `tsconfig.node.json` uses `NodeNext`).
   Import specifiers in `server/` must include the `.js` extension.
 
@@ -56,6 +60,7 @@ npm run db:migrate       # Apply SQLite migrations
 npm run leagues:discover -- --username <sleeper_username>
 npm run sync:backfill -- --league <slug|all>
 npm run sync:incremental
+npm run trades:audit         # verify trade manager attribution
 npm test                 # Vitest
 npm run typecheck        # tsc --noEmit on the frontend (vite build does not)
 ```

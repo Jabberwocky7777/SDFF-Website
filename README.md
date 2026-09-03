@@ -111,13 +111,24 @@ src/
   components/hub/        HubLayout (capability-aware sub-nav), LeagueSwitcher, FreshnessNote
   components/ErrorBoundary.tsx
   pages/AdminSettings    league + account management + sync/backup status
-  pages/hub/             Overview, Standings, History, HeadToHead, Records, Power, Managers, Trades
+  pages/hub/             Overview, Standings, History (+ playoff brackets), Matchups,
+                         HeadToHead, Records, Power, Managers, Trades, Drafts
+  pages/hub/ScrollTable  shared frame for the wide tables (bleed + sticky headers)
   pages/                 in-league pages: Rosters, Dues, Picks, Bylaws, Timeline, …
 ```
 
 Every route is nested under `/l/:slug/*`; live data is proxied per league via
 `/api/leagues/:slug/live/*`. Historical/computed data → SQLite. Live/volatile
 data → file cache. The frontend never calls Sleeper directly.
+
+### Roster ids are season-scoped
+
+A Sleeper `roster_id` only means something inside one league-season: managers
+swap slots between seasons, and Sleeper reports a past league's roster owner as
+whoever holds it *now*. Anything mapping a roster to a manager must join
+`team_season` for that same `league_id` — never carry a roster id across
+seasons. `npm run trades:audit` cross-checks that mapping against the draft and
+matchup records, which Sleeper does not rewrite.
 
 ## Scripts
 
@@ -130,5 +141,6 @@ data → file cache. The frontend never calls Sleeper directly.
 | `npm run leagues:discover -- --username <name>` | List your Sleeper leagues + IDs |
 | `npm run sync:backfill -- --league <slug\|all> [--force]` | Full historical ingest |
 | `npm run sync:incremental` | Current-season refresh |
+| `npm run trades:audit [-- --league <slug>] [-- --trade <id>]` | Check trades are attributed to the manager who owned that roster slot that season |
 | `npm test` | Vitest |
 | `npm run lint` | ESLint |
