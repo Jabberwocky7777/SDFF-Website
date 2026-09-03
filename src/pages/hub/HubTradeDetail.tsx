@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
 import { getTrade, type SeasonLine, type TradeAssetView, type TradeSideView } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import { EmptyState, fmtSigned } from './shared'
+import { EmptyState } from './shared'
+import { fmtSigned } from '@/lib/formatters'
 
 function AssetRow({ a }: { a: TradeAssetView }) {
   const valued = a.type === 'player' || (a.type === 'pick' && a.resolutionStatus === 'resolved')

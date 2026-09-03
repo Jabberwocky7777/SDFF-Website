@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
 import { getStandings } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import { Panel, Stat, fmtRecord } from './shared'
+import { Panel, Stat } from './shared'
+import { fmtRecord } from '@/lib/formatters'
 
 export default function LeagueOverview() {
   const { slug, meta } = useHub()

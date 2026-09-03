@@ -15,11 +15,11 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Path aliases */
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] },
+    /* Path aliases — resolved relative to this file; baseUrl is deprecated. */
+    "paths": { "@/*": ["./src/*"] },
 
     /* Linting */
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,

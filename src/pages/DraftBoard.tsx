@@ -1,5 +1,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { useDraftData, type EnrichedPlayer, type DynastyProfile } from '@/hooks/useDraftData'
+import {
+  useDraftData,
+  DEFAULT_POLL_INTERVAL_MS,
+  type EnrichedPlayer,
+  type DynastyProfile,
+} from '@/hooks/useDraftData'
 import { parseFlockCsv } from '@/lib/parseFlockCsv'
 import { apiFetch } from '@/api/client'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
@@ -244,15 +249,21 @@ export default function DraftBoard() {
 
   // ── Countdown ───────────────────────────────────────────────────────────────
 
-  const [countdown, setCountdown] = useState(30)
-
-  useEffect(() => { setCountdown(30) }, [lastRefresh])
+  // Derived from the last fetch rather than counted down in its own state, so
+  // it can't drift out of step with the query when a tick is dropped (a
+  // background tab throttles timers) and needs no reset when data arrives.
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     if (!liveDraftId) return
-    const id = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000)
+    const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [liveDraftId])
+
+  const refreshSeconds = DEFAULT_POLL_INTERVAL_MS / 1000
+  const countdown = lastRefresh
+    ? Math.max(0, refreshSeconds - Math.floor((now - lastRefresh) / 1000))
+    : refreshSeconds
 
   // ── Config handlers ─────────────────────────────────────────────────────────
 

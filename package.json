@@ -11,6 +11,7 @@
     "build:all": "npm run build && npm run build:server",
     "start": "node dist-server/index.js",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit --project tsconfig.app.json",
     "preview": "vite preview",
     "db:migrate": "tsx server/scripts/migrate.ts",
     "leagues:discover": "tsx server/scripts/discover-leagues.ts",

@@ -92,6 +92,9 @@ async function apiTextFetch(path: string): Promise<string> {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
+/** How often live pick data is re-fetched. The board's countdown reads this too. */
+export const DEFAULT_POLL_INTERVAL_MS = 30_000
+
 interface UseDraftDataOptions {
   liveDraftId: string
   pollIntervalMs?: number
@@ -99,7 +102,7 @@ interface UseDraftDataOptions {
 
 export function useDraftData({
   liveDraftId,
-  pollIntervalMs = 30_000,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: UseDraftDataOptions) {
   const queryClient = useQueryClient()
 
@@ -246,7 +249,9 @@ export function useDraftData({
     })
   }, [flockQuery.data, livePicksQuery.data, ktcQuery.data, fcQuery.data, playersMap])
 
-  const livePicks = livePicksQuery.data ?? []
+  // Memoised so the `?? []` fallback doesn't hand out a fresh array reference on
+  // every render and defeat the recentPicks memo below.
+  const livePicks = useMemo(() => livePicksQuery.data ?? [], [livePicksQuery.data])
   const currentPickNo = livePicks.length + 1
   const draftMeta = liveMetaQuery.data
   const totalPicks = draftMeta

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { adminFetch, apiFetch } from '@/api/client'
@@ -108,12 +108,6 @@ function AdminPanel() {
     queryKey: ['squad-pot'],
     queryFn: () => apiFetch('/squad-pot'),
   })
-
-  useEffect(() => {
-    if (squadPotInput === null && squadPotData?.balance != null) {
-      setSquadPotInput(String(squadPotData.balance))
-    }
-  }, [squadPotData, squadPotInput])
 
   // ── Derived / merge helpers ─────────────────────────────────────────────
   const mergedChampionshipHistory: ChampionshipRecord[] = championshipHistory.map((rec) => {

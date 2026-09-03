@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
 import { getStandings } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import { fmtRecord, EmptyState } from './shared'
+import { EmptyState } from './shared'
+import { fmtRecord } from '@/lib/formatters'
 
 export default function HubStandings() {
   const { slug, meta } = useHub()

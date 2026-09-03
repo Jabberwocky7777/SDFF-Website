@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useHub } from '@/components/hub/HubLayout'
 import { getPowerRankings } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import { DeltaArrow, EmptyState, fmtPct } from './shared'
+import { DeltaArrow, EmptyState } from './shared'
+import { fmtPct } from '@/lib/formatters'
 
 export default function HubPowerRankings() {
   const { slug } = useHub()

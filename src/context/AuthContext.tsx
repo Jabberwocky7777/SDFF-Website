@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getSession,
   login as apiLogin,
   logout as apiLogout,
   runSetup as apiSetup,
+  type SessionInfo,
 } from '@/api/hub'
 
 interface AuthContextValue {
@@ -33,52 +35,52 @@ export function useAuth(): AuthContextValue {
   return ctx
 }
 
+const SESSION_KEY = ['auth', 'session'] as const
+
+/** What the app assumes before the first /auth/session response lands. */
+const LOGGED_OUT: SessionInfo = {
+  authed: false,
+  slugs: [],
+  admin: false,
+  needsSetup: false,
+  hasLeagues: false,
+  flagshipSlug: null,
+  ephemeralStorage: false,
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authed, setAuthed] = useState(false)
-  const [slugs, setSlugs] = useState<string[]>([])
-  const [admin, setAdmin] = useState(false)
-  const [needsSetup, setNeedsSetup] = useState(false)
-  const [hasLeagues, setHasLeagues] = useState(false)
-  const [flagshipSlug, setFlagshipSlug] = useState<string | null>(null)
-  const [ephemeralStorage, setEphemeralStorage] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const queryClient = useQueryClient()
+
+  // The session is server state like everything else in the app, so it lives in
+  // the query cache rather than in eight useStates kept in sync by hand.
+  const { data, isPending } = useQuery({
+    queryKey: SESSION_KEY,
+    queryFn: getSession,
+    retry: false,
+    staleTime: Infinity,
+  })
+
+  const session = data ?? LOGGED_OUT
 
   const refresh = useCallback(async () => {
-    try {
-      const s = await getSession()
-      setAuthed(s.authed)
-      setSlugs(s.slugs ?? [])
-      setAdmin(!!s.admin)
-      setNeedsSetup(!!s.needsSetup)
-      setHasLeagues(!!s.hasLeagues)
-      setFlagshipSlug(s.flagshipSlug ?? null)
-      setEphemeralStorage(!!s.ephemeralStorage)
-    } catch {
-      setAuthed(false)
-      setSlugs([])
-      setAdmin(false)
-    }
-  }, [])
+    await queryClient.invalidateQueries({ queryKey: SESSION_KEY })
+  }, [queryClient])
 
-  useEffect(() => {
-    let active = true
-    refresh().then(() => {
-      if (active) setChecking(false)
-    })
-    return () => {
-      active = false
-    }
-  }, [refresh])
-
+  // A 401 on any request means the cookie died mid-session; drop to logged-out
+  // without a round trip. Subscribing to an external event and writing in the
+  // callback is the pattern effects are for.
   useEffect(() => {
     const handler = () => {
-      setAuthed(false)
-      setSlugs([])
-      setAdmin(false)
+      queryClient.setQueryData<SessionInfo>(SESSION_KEY, (prev) => ({
+        ...(prev ?? LOGGED_OUT),
+        authed: false,
+        slugs: [],
+        admin: false,
+      }))
     }
     window.addEventListener('sdff:auth-failure', handler)
     return () => window.removeEventListener('sdff:auth-failure', handler)
-  }, [])
+  }, [queryClient])
 
   const login = useCallback(
     async (code: string): Promise<string | null> => {
@@ -111,23 +113,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiLogout()
     } finally {
-      setAuthed(false)
-      setSlugs([])
-      setAdmin(false)
+      // Keep needsSetup/hasLeagues — they describe the install, not the session.
+      queryClient.setQueryData<SessionInfo>(SESSION_KEY, (prev) => ({
+        ...(prev ?? LOGGED_OUT),
+        authed: false,
+        slugs: [],
+        admin: false,
+      }))
     }
-  }, [])
+  }, [queryClient])
 
   return (
     <AuthContext.Provider
       value={{
-        authed,
-        checking,
-        needsSetup,
-        hasLeagues,
-        flagshipSlug,
-        ephemeralStorage,
-        slugs,
-        admin,
+        authed: session.authed,
+        checking: isPending,
+        needsSetup: session.needsSetup,
+        hasLeagues: session.hasLeagues,
+        flagshipSlug: session.flagshipSlug,
+        ephemeralStorage: session.ephemeralStorage,
+        slugs: session.slugs,
+        admin: session.admin,
         login,
         logout,
         setup,

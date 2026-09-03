@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useHub } from '@/components/hub/HubLayout'
 import { getAllPlay, getManagers } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
-import { EmptyState, fmtRecord, fmtSigned } from './shared'
+import { EmptyState } from './shared'
+import { fmtRecord, fmtSigned } from '@/lib/formatters'
 
 export default function HubManagers() {
   const { slug } = useHub()

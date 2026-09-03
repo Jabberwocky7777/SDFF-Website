@@ -1,23 +1,5 @@
+/** Presentational building blocks shared by the /l/:slug pages. */
 import type { ReactNode } from 'react'
-
-export function fmtPct(n: number): string {
-  return `${(n * 100).toFixed(1)}%`
-}
-
-export function fmtRecord(w: number, l: number, t = 0): string {
-  return t > 0 ? `${w}-${l}-${t}` : `${w}-${l}`
-}
-
-export function fmtSigned(n: number, digits = 1): string {
-  const v = n.toFixed(digits)
-  return n > 0 ? `+${v}` : v
-}
-
-export function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
-}
 
 /** Section wrapper matching the house card style. */
 export function Panel({
