@@ -22,6 +22,16 @@ function resolveInCacheDir(name: string): string {
   return path.join(cacheDir(), name)
 }
 
+/**
+ * Absolute path of a cache file, validated by the same rule as every read and
+ * write. Exported so callers can stat a cache file (to detect a change) without
+ * reading it, and so they inherit the traversal guard rather than rebuilding it.
+ * Throws on an unsafe name.
+ */
+export function cacheFilePath(name: string): string {
+  return resolveInCacheDir(name)
+}
+
 /** Atomically replace a file in the cache dir. Throws if the write fails. */
 export function writeCacheFile(name: string, contents: string): void {
   const file = resolveInCacheDir(name)

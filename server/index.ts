@@ -35,6 +35,39 @@ trace(
 process.on('unhandledRejection', (err) => fatal('unhandledRejection', err))
 process.on('uncaughtException', (err) => die('uncaughtException', err))
 
+// ── Shutdown accounting ────────────────────────────────────────────────────
+// Without these, an orderly `docker stop` and an OOM kill look identical in the
+// log: the last line is a routine sync and then nothing. A SIGTERM we can log;
+// a SIGKILL we can't, so the absence of these lines becomes the evidence that
+// the process was killed rather than asked to stop. `log.*` uses fs.writeSync,
+// so the line lands even though the process is about to go away.
+let httpServer: import('node:http').Server | null = null
+
+function shutdown(signal: NodeJS.Signals): void {
+  const mem = process.memoryUsage()
+  log.info('shutdown signal', {
+    signal,
+    uptimeSeconds: Math.round(process.uptime()),
+    rssMb: Math.round(mem.rss / 1024 / 1024),
+    heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+  })
+  // Stop accepting connections, but don't wait forever on a keep-alive client.
+  const forceExit = setTimeout(() => {
+    log.warn('shutdown timed out — exiting anyway')
+    process.exit(0)
+  }, 8000)
+  forceExit.unref()
+  if (!httpServer) process.exit(0)
+  httpServer.close(() => {
+    log.info('shutdown complete', { signal })
+    process.exit(0)
+  })
+}
+
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sig, () => shutdown(sig))
+}
+
 // ── Bring up the database (best-effort) ────────────────────────────────────
 // If it fails we still start the HTTP server in a diagnostic mode so the error
 // is visible in a browser and the container stays up instead of crash-looping.
@@ -84,9 +117,9 @@ if (dbError) {
   app.get('/{*splat}', (req, res) => {
     res.status(req.path === '/' ? 200 : 503).type('html').send(page(dbError!))
   })
-  app.listen(PORT, () => trace(`diagnostic server listening on :${PORT}`)).on('error', (err) =>
-    fatal(`could not bind port ${PORT}`, err),
-  )
+  httpServer = app
+    .listen(PORT, () => trace(`diagnostic server listening on :${PORT}`))
+    .on('error', (err) => fatal(`could not bind port ${PORT}`, err))
 } else {
   // ── Normal app ──────────────────────────────────────────────────────────
   const distPath = path.join(__dirname, '..', 'dist')
@@ -158,7 +191,7 @@ if (dbError) {
     res.status(500).json({ error: 'internal server error' })
   })
 
-  const server = app.listen(PORT, () => {
+  const server = (httpServer = app.listen(PORT, () => {
     trace(`listening on :${PORT}`)
     if (IS_DEV) log.info('dev — open the app to set up the admin password / add leagues')
     setTimeout(() => {
@@ -168,6 +201,6 @@ if (dbError) {
         log.error('autobackfill could not start', { err: (err as Error).message })
       }
     }, 8000)
-  })
+  }))
   server.on('error', (err) => fatal(`could not bind port ${PORT}`, err))
 }

@@ -5,7 +5,13 @@
  * data goes to SQLite.
  */
 import type { Response } from 'express'
-import { readCache, writeCache, readStale } from '../cache.js'
+import {
+  readCache,
+  readCacheSerialized,
+  readStale,
+  readStaleSerialized,
+  writeCache,
+} from '../cache.js'
 import { getSleeperClient } from './client.js'
 import { log } from '../log.js'
 
@@ -82,6 +88,50 @@ export async function serveCachedUrl(
     } else {
       log.error('external proxy failed with no cache to fall back on', { err: (err as Error).message })
       res.status(502).json({ error: 'Upstream API unavailable and no cache found.' })
+    }
+  }
+}
+
+/** Send pre-serialized JSON text without routing it back through res.json(). */
+function sendJson(res: Response, json: string): void {
+  res.type('application/json').send(json)
+}
+
+/**
+ * serveCached for payloads big enough that parsing them per request is a
+ * memory hazard — currently just the ~15 MB `/players/nfl` blob. Identical
+ * behaviour (TTL, stale fallback, 502), but the body never becomes a JS object
+ * graph on the way to the client. Only safe for routes that forward the payload
+ * untouched; anything that needs to read or reshape the data wants serveCached.
+ */
+export async function serveCachedLarge(
+  res: Response,
+  cacheKey: string,
+  sleeperPath: string,
+  ttlSeconds: number,
+): Promise<void> {
+  const hit = readCacheSerialized(cacheKey, ttlSeconds)
+  if (hit != null) {
+    sendJson(res, hit)
+    return
+  }
+  try {
+    const data = await getSleeperClient().raw(`${SLEEPER_BASE}${sleeperPath}`)
+    writeCache(cacheKey, data)
+    // Serialized once more here rather than re-reading the file we just wrote.
+    // This is the cache-miss path — once a day for the player blob.
+    sendJson(res, JSON.stringify(data ?? null))
+  } catch (err) {
+    const stale = readStaleSerialized(cacheKey)
+    if (stale != null) {
+      res.setHeader('X-Cache-Stale', 'true')
+      sendJson(res, stale)
+    } else {
+      log.error('sleeper proxy failed with no cache to fall back on', {
+        key: cacheKey,
+        err: (err as Error).message,
+      })
+      res.status(502).json({ error: 'Sleeper API unavailable and no cache found.' })
     }
   }
 }

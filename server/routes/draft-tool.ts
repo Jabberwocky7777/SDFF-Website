@@ -8,14 +8,14 @@
  */
 import express, { Router } from 'express'
 import { readCache, readStale, writeCache } from '../cache.js'
-import { serveCached, serveCachedUrl } from '../sleeper/proxy.js'
+import { serveCached, serveCachedLarge, serveCachedUrl } from '../sleeper/proxy.js'
 import { fetchKtcHtmlRankings, readFlockCsv, writeFlockCsv } from '../sleeper/external.js'
 import { log } from '../log.js'
 
 const router = Router()
 
 router.get('/players', (_req, res) => {
-  void serveCached(res, 'nfl_players', '/players/nfl', 24 * 60 * 60)
+  void serveCachedLarge(res, 'nfl_players', '/players/nfl', 24 * 60 * 60)
 })
 
 router.get('/draft/:draftId', (req, res) => {

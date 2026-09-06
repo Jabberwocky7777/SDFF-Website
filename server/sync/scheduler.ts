@@ -43,9 +43,13 @@ async function runIncremental(trigger: string): Promise<void> {
     })
     lastRun = Date.now()
     lastError = null
+    // rss is here as a heartbeat: this line is the one thing that reliably
+    // appears hourly, so a memory climb toward the container limit shows up as
+    // a trend instead of as an unexplained silent kill.
     log.info('scheduler incremental done', {
       trigger,
       seconds: Number(((Date.now() - started) / 1000).toFixed(1)),
+      rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
     })
   } catch (err) {
     lastError = (err as Error).message

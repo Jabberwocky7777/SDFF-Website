@@ -22,7 +22,7 @@ import { requireAdmin } from '../auth/middleware.js'
 import { readCache, readStale, writeCache } from '../cache.js'
 import { getSleeperClient } from '../sleeper/client.js'
 import { fetchKtcHtmlRankings, readFlockCsv, writeFlockCsv } from '../sleeper/external.js'
-import { isGameDay, serveCached, serveCachedUrl } from '../sleeper/proxy.js'
+import { isGameDay, serveCached, serveCachedLarge, serveCachedUrl } from '../sleeper/proxy.js'
 import {
   getFamily,
   getH2HGameLog,
@@ -330,7 +330,7 @@ router.get('/live/state', (_req, res) => {
 })
 
 router.get('/live/players', (_req, res) => {
-  void serveCached(res, 'nfl_players', '/players/nfl', 24 * 60 * 60)
+  void serveCachedLarge(res, 'nfl_players', '/players/nfl', 24 * 60 * 60)
 })
 
 router.get('/live/stats/:season', (req, res) => {
