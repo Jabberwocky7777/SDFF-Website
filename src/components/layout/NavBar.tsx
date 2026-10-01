@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import MobileMenu from './MobileMenu'
 import { useAuth } from '@/context/AuthContext'
@@ -9,6 +9,8 @@ export default function NavBar() {
   const { admin, logout } = useAuth()
   const { leagues } = useLeagues()
   const navigate = useNavigate()
+  const closeMenu = useCallback(() => setOpen(false), [])
+  const signOut = () => void logout().then(() => navigate('/'))
 
   // `leagues` is already scoped to what this session can see (server-filtered).
   const showLeagues = leagues.length > 0
@@ -49,7 +51,7 @@ export default function NavBar() {
             ))}
             {leagues.length > 1 && <NavLeagueMenu />}
             <button
-              onClick={() => logout().then(() => navigate('/'))}
+              onClick={signOut}
               className="ml-1 px-3 py-2 text-small font-medium text-muted hover:text-gold transition-colors"
             >
               Sign out
@@ -72,9 +74,11 @@ export default function NavBar() {
       </nav>
 
       <MobileMenu
-        links={[...links, ...leagues.map((l) => ({ to: `/l/${l.slug}`, label: l.displayName }))]}
+        links={links.map((l) => (l.to === '/l' ? { ...l, label: 'All leagues' } : l))}
+        leagues={leagues}
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeMenu}
+        onSignOut={signOut}
       />
     </>
   )

@@ -15,6 +15,14 @@ export default {
         border:     'rgba(224,181,68,0.18)',
         borderLow:  'rgba(244,239,226,0.08)',
       },
+      // Steps the default scale lacks. Tailwind silently drops an opacity
+      // modifier that isn't on the scale, which once left the nav and mobile
+      // menu fully transparent.
+      opacity: {
+        3: '0.03',
+        8: '0.08',
+        98: '0.98',
+      },
       maxWidth: {
         // The one page-width token. Header, main and footer all key off this.
         shell: '96rem',

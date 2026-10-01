@@ -29,7 +29,7 @@ export interface MatchupGame {
    * The team still scores; there is just nothing to win.
    */
   bye: boolean
-  /** Decided. A bye is decided as soon as its points are in. */
+  /** Decided: the week has gone final (see nflCalendar.ts). */
   final: boolean
   /**
    * The pair's all-time record across every season of this league family,
@@ -91,7 +91,7 @@ function h2hIndex(db: DB, familyId: number): Map<string, { wins: number; losses:
     .prepare(
       `SELECT m.user_id, m.opponent_user_id, m.result, COUNT(*) AS n
        FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
-       WHERE ls.family_id = ? AND m.result IS NOT NULL AND m.is_consolation = 0
+       WHERE ls.family_id = ? AND m.is_final = 1 AND m.result IS NOT NULL AND m.is_consolation = 0
          AND m.user_id IS NOT NULL AND m.opponent_user_id IS NOT NULL
        GROUP BY m.user_id, m.opponent_user_id, m.result`,
     )
@@ -125,6 +125,7 @@ interface RawSide {
   result: 'W' | 'L' | 'T' | null
   is_playoff: number
   is_consolation: number
+  is_final: number
   team_name: string | null
   name: string | null
 }
@@ -137,7 +138,7 @@ export function getWeekMatchups(db: DB, slug: string, season: number, week: numb
   const sides = db
     .prepare(
       `SELECT m.league_id, ls.season, m.week, m.matchup_id, m.roster_id, m.user_id,
-              m.points, m.result, m.is_playoff, m.is_consolation,
+              m.points, m.result, m.is_playoff, m.is_consolation, m.is_final,
               ts.team_name,
               COALESCE(mg.canonical_name, mg.display_name, m.user_id) AS name
        FROM matchup m
@@ -186,7 +187,8 @@ export function getWeekMatchups(db: DB, slug: string, season: number, week: numb
       isPlayoff: !!home.is_playoff,
       isConsolation: !!home.is_consolation,
       bye: !away,
-      final: away ? home.result != null && away.result != null : home.points != null,
+      // Live scores have a margin long before the game is decided.
+      final: home.is_final === 1 && (away ? home.result != null && away.result != null : home.points != null),
       h2h: pairRecord
         ? {
             ...pairRecord,

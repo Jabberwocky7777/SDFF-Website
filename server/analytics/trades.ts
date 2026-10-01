@@ -224,7 +224,8 @@ function buildContext(db: DB, familyId: number, dynasty: boolean): FamilyCtx {
                       AND mu.week = pwr.week
                       AND mu.roster_id = pwr.roster_id
        WHERE ls.family_id = ? AND pwr.started = 1 AND pwr.points IS NOT NULL
-         AND mu.result IS NOT NULL AND mu.is_consolation = 0 AND mu.data_quality IS NULL`,
+         AND mu.is_final = 1 AND mu.result IS NOT NULL AND mu.is_consolation = 0
+         AND mu.data_quality IS NULL`,
     )
     .all(familyId) as Array<{ season: number; position: string | null; points: number }>) {
     const pos = row.position ?? 'OTHER'
@@ -351,7 +352,7 @@ function attributePlayer(
                       AND mu.roster_id = pwr.roster_id
        WHERE ls.family_id = @fam AND pwr.player_id = @pid AND pwr.user_id = @uid
          AND pwr.points IS NOT NULL
-         AND mu.result IS NOT NULL
+         AND mu.is_final = 1 AND mu.result IS NOT NULL
          AND mu.is_consolation = 0
          AND mu.data_quality IS NULL
          AND ${seasonClause}`,

@@ -46,6 +46,11 @@ once into the DB on a fresh install (`server/config/bootstrap.ts`), then ignored
   -> manager by joining `team_season` on that same `league_id`; never carry a
   roster id across seasons (managers swap slots, and Sleeper reports a past
   league's roster owner as whoever holds it now).
+- The `matchup` / `player_week_roster` tables hold the week in progress (live
+  scores for the Matchups scoreboard). Anything that reads history — standings,
+  H2H, records, power, all-play, trades, draft order — must filter
+  `is_final = 1`. Finality is set at ingest from `server/analytics/nflCalendar.ts`
+  (a week is final the Tuesday morning after its Monday-night game).
 - Server is ESM (`"type": "module"`, `tsconfig.node.json` uses `NodeNext`).
   Import specifiers in `server/` must include the `.js` extension.
 

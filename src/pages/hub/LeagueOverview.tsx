@@ -47,7 +47,9 @@ export default function LeagueOverview() {
 
       {latestWeek && recent.data && recent.data.games.length > 0 && (
         <Panel
-          title={`${latestWeek.season} · week ${latestWeek.week}`}
+          title={`${latestWeek.season} · week ${latestWeek.week}${
+            recent.data.games.some((g) => !g.final && !g.bye) ? ' · in progress' : ''
+          }`}
           right={
             <Link
               to={`/l/${slug}/matchups`}

@@ -131,7 +131,7 @@ export function getSeasonBracket(db: DB, slug: string, season: number): SeasonBr
   // Scores, keyed week:roster. A bracket round maps onto one fantasy week.
   const points = new Map<string, number>()
   for (const r of db
-    .prepare(`SELECT week, roster_id, points FROM matchup WHERE league_id = ?`)
+    .prepare(`SELECT week, roster_id, points FROM matchup WHERE league_id = ? AND is_final = 1`)
     .all(leagueId) as Array<{ week: number; roster_id: number; points: number | null }>) {
     if (r.points != null) points.set(`${r.week}:${r.roster_id}`, r.points)
   }

@@ -170,6 +170,8 @@ export interface MatchupRow {
   startersPointsJson: string | null
   playersJson: string | null
   playersPointsJson: string | null
+  /** False for a week still being played — history queries skip it. */
+  isFinal: boolean
 }
 
 export function upsertMatchup(db: DB, row: MatchupRow): void {
@@ -178,12 +180,12 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
        league_id, week, matchup_id, roster_id, user_id, points,
        opponent_roster_id, opponent_user_id, opponent_points, result,
        is_playoff, is_consolation, median_result, data_quality,
-       starters_json, starters_points_json, players_json, players_points_json
+       starters_json, starters_points_json, players_json, players_points_json, is_final
      ) VALUES (
        @leagueId, @week, @matchupId, @rosterId, @userId, @points,
        @opponentRosterId, @opponentUserId, @opponentPoints, @result,
        @isPlayoff, @isConsolation, @medianResult, @dataQuality,
-       @startersJson, @startersPointsJson, @playersJson, @playersPointsJson
+       @startersJson, @startersPointsJson, @playersJson, @playersPointsJson, @isFinal
      )
      ON CONFLICT(league_id, week, roster_id) DO UPDATE SET
        matchup_id = excluded.matchup_id,
@@ -200,11 +202,13 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
        starters_json = excluded.starters_json,
        starters_points_json = excluded.starters_points_json,
        players_json = excluded.players_json,
-       players_points_json = excluded.players_points_json`,
+       players_points_json = excluded.players_points_json,
+       is_final = excluded.is_final`,
   ).run({
     ...row,
     isPlayoff: row.isPlayoff ? 1 : 0,
     isConsolation: row.isConsolation ? 1 : 0,
+    isFinal: row.isFinal ? 1 : 0,
   })
 }
 
@@ -217,19 +221,21 @@ export interface PlayerWeekRosterRow {
   userId: string | null
   points: number | null
   started: boolean
+  isFinal: boolean
 }
 
 export function upsertPlayerWeekRoster(db: DB, row: PlayerWeekRosterRow): void {
   db.prepare(
-    `INSERT INTO player_week_roster (league_id, season, week, player_id, roster_id, user_id, points, started)
-     VALUES (@leagueId, @season, @week, @playerId, @rosterId, @userId, @points, @started)
+    `INSERT INTO player_week_roster (league_id, season, week, player_id, roster_id, user_id, points, started, is_final)
+     VALUES (@leagueId, @season, @week, @playerId, @rosterId, @userId, @points, @started, @isFinal)
      ON CONFLICT(league_id, week, player_id) DO UPDATE SET
        season = excluded.season,
        roster_id = excluded.roster_id,
        user_id = excluded.user_id,
        points = excluded.points,
-       started = excluded.started`,
-  ).run({ ...row, started: row.started ? 1 : 0 })
+       started = excluded.started,
+       is_final = excluded.is_final`,
+  ).run({ ...row, started: row.started ? 1 : 0, isFinal: row.isFinal ? 1 : 0 })
 }
 
 export interface TransactionRow {

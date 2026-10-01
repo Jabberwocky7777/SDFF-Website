@@ -274,7 +274,7 @@ export function getRookieDraftOrder(db: DB, slug: string, now = Date.now()): Roo
   const games = db
     .prepare(
       `SELECT roster_id, week, points, result, median_result, players_json, players_points_json
-       FROM matchup WHERE league_id = ? AND week <= ? AND week < ?`,
+       FROM matchup WHERE league_id = ? AND week <= ? AND week < ? AND is_final = 1`,
     )
     .all(leagueId, throughWeek, playoffWeekStart) as MatchupRow[]
   if (games.length === 0) return base

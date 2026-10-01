@@ -53,7 +53,7 @@ export function getAllPlay(db: DB, slug: string, season?: number): AllPlayRow[] 
       `SELECT m.league_id, m.week, m.user_id, m.points, m.result
        FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
        WHERE ls.family_id = ?${seasonClause}
-         AND m.result IS NOT NULL AND m.user_id IS NOT NULL
+         AND m.is_final = 1 AND m.result IS NOT NULL AND m.user_id IS NOT NULL
          AND m.points IS NOT NULL
          AND m.is_playoff = 0 AND m.is_consolation = 0`,
     )

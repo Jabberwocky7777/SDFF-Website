@@ -103,7 +103,7 @@ function familyGames(db: DB, slug: string, opts: { season?: number } = {}): RawG
        FROM matchup m
        JOIN league_season ls ON ls.league_id = m.league_id
        WHERE ls.family_id = ?${seasonClause}
-         AND m.result IS NOT NULL AND m.user_id IS NOT NULL`,
+         AND m.is_final = 1 AND m.result IS NOT NULL AND m.user_id IS NOT NULL`,
     )
     .all(...params) as RawGame[]
 }
@@ -376,7 +376,8 @@ export function getH2HGameLog(db: DB, slug: string, userA: string, userB: string
     .prepare(
       `SELECT ls.season, m.week, m.points, m.opponent_points, m.result, m.is_playoff, m.is_consolation
        FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
-       WHERE ls.family_id = ? AND m.user_id = ? AND m.opponent_user_id = ? AND m.result IS NOT NULL
+       WHERE ls.family_id = ? AND m.user_id = ? AND m.opponent_user_id = ?
+         AND m.is_final = 1 AND m.result IS NOT NULL
          AND m.is_consolation = 0
        ORDER BY ls.season, m.week`,
     )

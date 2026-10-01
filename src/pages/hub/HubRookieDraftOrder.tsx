@@ -98,7 +98,41 @@ export default function HubRookieDraftOrder() {
     <div className="space-y-8">
       <div>
         <Header data={data} />
-        <ScrollTable>
+
+        {/* Phones: one card per pick, everything visible without side-scrolling. */}
+        <div className="sm:hidden bg-surface border border-borderLow rounded-lg divide-y divide-borderLow">
+          {data.teams.map((t, i) => {
+            const pick = ownerOf(1, t.rosterId)
+            const newGroup = i > 0 && data.teams[i - 1].group !== t.group
+            return (
+              <div key={t.rosterId} className={`flex gap-3 px-4 py-3 ${newGroup ? 'border-t-2 border-t-borderLow' : ''}`}>
+                <div className="font-mono text-num font-bold text-gold tabular w-11 shrink-0 pt-0.5">
+                  {pick?.label ?? `1.${String(t.slot).padStart(2, '0')}`}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-text truncate">{t.name}</span>
+                    <span className="font-mono text-num tabular font-semibold text-text shrink-0">
+                      {fmtPoints(t.maxPointsFor)}
+                    </span>
+                  </div>
+                  {pick?.traded && <div className="text-small text-gold">→ owned by {pick.ownerName}</div>}
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <span className={`text-label font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap ${GROUPS[t.group].chip}`}>
+                      {GROUPS[t.group].label}
+                    </span>
+                    <span className="text-label text-mutedLow tabular">Max PF</span>
+                  </div>
+                  <div className="text-small text-muted mt-1">
+                    {fmtRecord(t.wins, t.losses, t.ties)} · {fmtPoints(t.pointsFor)} PF · {basis(t, data)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <ScrollTable className="hidden sm:block">
           <table className="w-full min-w-[680px]">
             <thead>
               <tr className="bg-surfaceHi border-b border-borderLow text-label text-muted uppercase tracking-[0.04em]">

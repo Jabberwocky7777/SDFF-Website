@@ -14,6 +14,7 @@ import { deriveCapabilities, type LeagueCapabilities } from './capabilities.js'
 import { asRosterId, deriveFinalRanks } from './brackets.js'
 import { classifyWeek, type QualityCandidate } from './dataQuality.js'
 import { syncFamilyScoring } from './playerStats.js'
+import { nflWeekFinalAt } from '../analytics/nflCalendar.js'
 import {
   applyManagerAliases,
   finishSyncLog,
@@ -133,6 +134,7 @@ function normalizeWeek(
   rosterUser: Map<number, string | null>,
   playoffRosterIds: Set<number>,
   capabilities: LeagueCapabilities,
+  isFinal: boolean,
 ): NormalizedWeek {
   const rows: NormalizedWeek['rows'] = []
   const playerRows: NormalizedWeek['playerRows'] = []
@@ -165,13 +167,14 @@ function normalizeWeek(
     }
     const oppPoints = numOrNull(opponent?.points)
 
+    // A game still being played has no result yet, however the score stands.
     let result: 'W' | 'L' | 'T' | null = null
-    if (points != null && oppPoints != null) {
+    if (isFinal && points != null && oppPoints != null) {
       result = points > oppPoints ? 'W' : points < oppPoints ? 'L' : 'T'
     }
 
     let medianResult: 'W' | 'L' | null = null
-    if (median != null && points != null) medianResult = points > median ? 'W' : 'L'
+    if (isFinal && median != null && points != null) medianResult = points > median ? 'W' : 'L'
 
     const inPlayoffBracket = playoffRosterIds.has(rosterId)
     rows.push({
@@ -195,6 +198,7 @@ function normalizeWeek(
       startersPointsJson: m.starters_points ? JSON.stringify(m.starters_points) : null,
       playersJson: m.players ? JSON.stringify(m.players) : null,
       playersPointsJson: m.players_points ? JSON.stringify(m.players_points) : null,
+      isFinal,
     })
     candidates.push({
       points,
@@ -215,6 +219,7 @@ function normalizeWeek(
         userId,
         points: numOrNull(pts[pid]),
         started: starters.has(pid),
+        isFinal,
       })
     }
   }
@@ -462,6 +467,8 @@ async function ingestSeason(
   // Matchups + weekly roster snapshots.
   let weekCount = 0
   for (let week = 1; week <= weekCeiling; week++) {
+    // Judged before the fetch: scores read after the cutoff are final scores.
+    const isFinal = args.isComplete || nflWeekFinalAt(season, week) <= Date.now()
     const matchups = await client.getMatchups(leagueId, week)
     if (matchups.length === 0) continue
     // GOTCHA: `points` is null for weeks that never happened AND 0 for a week
@@ -478,6 +485,7 @@ async function ingestSeason(
       rosterUser,
       playoffRosterIds,
       capabilities,
+      isFinal,
     )
     const writeWeek = db.transaction(() => {
       for (const row of rows) upsertMatchup(db, row)

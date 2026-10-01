@@ -45,7 +45,7 @@ export function getPowerRankings(db: DB, slug: string, season?: number): {
     (db
       .prepare(
         `SELECT ls.season FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
-         WHERE ls.family_id = ? AND m.result IS NOT NULL
+         WHERE ls.family_id = ? AND m.is_final = 1 AND m.result IS NOT NULL
          ORDER BY ls.season DESC LIMIT 1`,
       )
       .get(family.id) as { season: number } | undefined)?.season
@@ -57,7 +57,7 @@ export function getPowerRankings(db: DB, slug: string, season?: number): {
       `SELECT m.week, m.user_id AS userId, m.points, m.result
        FROM matchup m JOIN league_season ls ON ls.league_id = m.league_id
        WHERE ls.family_id = ? AND ls.season = ?
-         AND m.result IS NOT NULL AND m.user_id IS NOT NULL AND m.points IS NOT NULL
+         AND m.is_final = 1 AND m.result IS NOT NULL AND m.user_id IS NOT NULL AND m.points IS NOT NULL
          AND m.is_playoff = 0 AND m.is_consolation = 0`,
     )
     .all(family.id, targetSeason) as Game[]
