@@ -7,7 +7,9 @@ across every league you add.
 
 Everything lives inside a league: pick a league and its sub-nav adapts to what
 that league supports. Dynasty leagues additionally get the dues dashboard,
-rookie-pick tracker, bylaws, calendar and news.
+rookie-pick tracker, an "if the season ended today" rookie draft order (built from
+finished weeks only — a week counts once it goes final the Tuesday after), bylaws,
+calendar and news.
 
 ## Tech Stack
 
@@ -112,7 +114,8 @@ src/
   components/ErrorBoundary.tsx
   pages/AdminSettings    league + account management + sync/backup status
   pages/hub/             Overview, Standings, History (+ playoff brackets), Matchups,
-                         HeadToHead, Records, Power, Managers, Trades, Drafts
+                         HeadToHead, Records, Power, Managers, Trades, Drafts,
+                         RookieDraftOrder (dynasty)
   pages/hub/ScrollTable  shared frame for the wide tables (bleed + sticky headers)
   pages/                 in-league pages: Rosters, Dues, Picks, Bylaws, Timeline, …
 ```

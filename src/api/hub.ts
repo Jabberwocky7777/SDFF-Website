@@ -503,6 +503,55 @@ export const getDraftSeasons = (slug: string) =>
 export const getDraftBoard = (slug: string, season: number) =>
   hubFetch<DraftBoardView>(`/leagues/${slug}/drafts/${season}`)
 
+// ── Rookie draft order (dynasty) ────────────────────────────────────────────
+
+export interface RookieOrderTeam {
+  slot: number
+  /** 1 = missed playoffs · 2 = playoffs, no money · 3 = money finish */
+  group: 1 | 2 | 3
+  rosterId: number
+  userId: string | null
+  name: string
+  teamName: string | null
+  wins: number
+  losses: number
+  ties: number
+  pointsFor: number
+  maxPointsFor: number
+  seed: number | null
+  /** 1 = champion. Projected from seed until the season is complete. */
+  moneyPlace: number | null
+}
+
+export interface RookieOrderPick {
+  round: number
+  slot: number
+  label: string
+  originalRosterId: number
+  ownerRosterId: number
+  ownerName: string
+  traded: boolean
+}
+
+export interface RookieDraftOrder {
+  season: number | null
+  draftYear: number | null
+  status: 'final' | 'projected' | 'waiting' | 'none'
+  throughWeek: number
+  regularSeasonWeeks: number
+  nextUpdateAt: number | null
+  playoffTeams: number
+  paidPlaces: number
+  playoffField: 'standings' | 'bracket'
+  moneyBasis: 'seed' | 'final'
+  hasMedianScoring: boolean
+  teams: RookieOrderTeam[]
+  rounds: RookieOrderPick[][]
+}
+
+export const getRookieDraftOrder = (slug: string) =>
+  hubFetch<RookieDraftOrder>(`/leagues/${slug}/rookie-draft-order`)
+
 // ── Matchups ────────────────────────────────────────────────────────────────
 
 export interface MatchupSide {

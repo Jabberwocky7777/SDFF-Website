@@ -31,6 +31,7 @@ import HubManagerProfile from '@/pages/hub/HubManagerProfile'
 import HubTrades from '@/pages/hub/HubTrades'
 import HubTradeDetail from '@/pages/hub/HubTradeDetail'
 import HubDrafts from '@/pages/hub/HubDrafts'
+import HubRookieDraftOrder from '@/pages/hub/HubRookieDraftOrder'
 
 /** `/` → the last league viewed, else the first accessible one, else the picker
  *  (or setup, for a fresh admin with no leagues yet). */
@@ -131,6 +132,7 @@ function AppRoutes() {
             <Route path="draft" element={<HubDrafts />} />
 
             {/* Dynasty only */}
+            <Route path="draft-order" element={<DynastyOnly><HubRookieDraftOrder /></DynastyOnly>} />
             <Route path="picks" element={<DynastyOnly><Picks /></DynastyOnly>} />
             <Route path="dues" element={<DynastyOnly><Dues /></DynastyOnly>} />
             <Route path="bylaws" element={<DynastyOnly><Bylaws /></DynastyOnly>} />

@@ -10,6 +10,7 @@
  *   GET /api/leagues/:slug/h2h/:a/vs/:b        head-to-head game log
  *   GET /api/leagues/:slug/managers            career table (= standings)
  *   GET /api/leagues/:slug/managers/:userId    one manager's profile
+ *   GET /api/leagues/:slug/rookie-draft-order  projected rookie draft order (dynasty)
  *   GET /api/leagues/:slug/live/{league,users,rosters,matchups/:week}
  *
  * `:slug` is validated against config by `requireLeagueAccess` (mounted in
@@ -39,6 +40,7 @@ import { getTradeDetail, getTradeFeed } from '../analytics/trades.js'
 import { getDraftBoard, getDraftSeasons } from '../analytics/drafts.js'
 import { getMatchupWeeks, getWeekMatchups } from '../analytics/matchups.js'
 import { getBracketSeasons, getSeasonBracket } from '../analytics/brackets.js'
+import { getRookieDraftOrder } from '../analytics/rookieDraftOrder.js'
 import { log } from '../log.js'
 
 const router = Router({ mergeParams: true })
@@ -117,6 +119,15 @@ router.get('/h2h', (req, res) => {
 
 router.get('/h2h/:userA/vs/:userB', (req, res) => {
   res.json(getH2HGameLog(getDb(), params(req).slug, params(req).userA, params(req).userB))
+})
+
+router.get('/rookie-draft-order', (req, res) => {
+  const slug = params(req).slug
+  if (getLeague(slug)!.type !== 'dynasty') {
+    res.status(404).json({ error: 'rookie drafts are a dynasty-league feature' })
+    return
+  }
+  res.json(getRookieDraftOrder(getDb(), slug))
 })
 
 router.get('/brackets', (req, res) => {
