@@ -33,9 +33,12 @@ function fmtWhen(ms: number): string {
 
 /** Why a team sits where it does, in one line. */
 function basis(t: RookieOrderTeam, data: RookieDraftOrder): string {
+  // Projected: the playoffs are assumed to go chalk, so a playoff team's slot
+  // is its seed and nothing else. Final: the bylaws' reverse Max PF applies.
+  if (data.moneyBasis === 'seed' && t.seed != null) return `projected · ${t.seed} seed`
   if (t.group === 3) {
     const place = PLACE[(t.moneyPlace ?? 1) - 1] ?? `#${t.moneyPlace}`
-    return data.moneyBasis === 'final' ? place : `${place} (as ${t.seed} seed)`
+    return place
   }
   if (t.group === 2) return `${t.seed} seed · reverse Max PF`
   return 'Reverse Max PF'
@@ -260,7 +263,7 @@ export default function HubRookieDraftOrder() {
           {data.playoffTeams} seed to the most points among the rest
           {data.playoffField === 'bracket' ? ' — taken from the actual playoff bracket now that it’s set' : ''}.
           {data.moneyBasis === 'seed' &&
-            ` Until the playoffs are played, prize money is projected by seed (1 seed = champion).`}{' '}
+            ` Until the playoffs are played the projection assumes the higher seed wins every playoff game, so the field lands in reverse seed order — the ${data.playoffTeams} seed first, the 1 seed last.`}{' '}
           Max PF is each week&apos;s best possible lineup, regular season only. A Max PF tie goes to the team
           with fewer actual points.
         </p>

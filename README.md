@@ -114,7 +114,7 @@ src/
   components/ErrorBoundary.tsx
   pages/AdminSettings    league + account management + sync/backup status
   pages/hub/             Overview, Standings, History (+ playoff brackets), Matchups,
-                         HeadToHead, Records, Power, Managers, Trades, Drafts,
+                         MaxPf, HeadToHead, Records, Power, Managers, Trades, Drafts,
                          RookieDraftOrder (dynasty)
   pages/hub/ScrollTable  shared frame for the wide tables (bleed + sticky headers)
   pages/                 in-league pages: Rosters, Dues, Picks, Bylaws, Timeline, …
@@ -123,6 +123,46 @@ src/
 Every route is nested under `/l/:slug/*`; live data is proxied per league via
 `/api/leagues/:slug/live/*`. Historical/computed data → SQLite. Live/volatile
 data → file cache. The frontend never calls Sleeper directly.
+
+### Max PF
+
+Max PF is the best lineup a team could have started. The players that can fill
+a set of slots at once form a transversal matroid, so `optimalLineup.ts` walks
+them in descending points and keeps each one that still leaves a complete
+assignment (an augmenting-path test) — exact for overlapping flex types and for
+players eligible at more than one position. It returns the assignment, not just
+a total, so the Max PF page can name the bench player who belonged in the WR
+slot. The total is stored on `matchup.optimal_points` at ingest.
+
+Every slot that *can* be filled is filled, negative scores included — a roster
+whose only DEF put up -7 has Sleeper's Max PF 7 points lower, not level.
+Leaving such a slot empty put us above Sleeper's `ppts` on 11 of 44 rosters
+across the hub's four leagues; filling it reconciled all of them.
+
+Eligibility comes from `fantasy_positions`, not the headline `position`:
+Sleeper lists Travis Hunter as a DB with `fantasy_positions = ['WR','DB']` and
+starts him at WR in its own Max PF. Because the dictionary moves under already
+-final weeks, every sync also recomputes `optimal_points` for stored weeks from
+data it already holds, with no Sleeper calls.
+
+Sleeper counts **every** rostered player toward Max PF, taxi squad and IR
+included, and that is the default here too — the `?taxi=0` toggle answers the
+different question of what a manager could legally have started. Since Sleeper
+exposes only a roster's *current* taxi and reserve lists, the weekly record is
+built up as the season runs in `roster_week_status`: the live week is
+re-snapshotted every sync and frozen once it goes final. A current season's
+earlier weeks get today's taxi list marked `inferred`, which the SDFF bylaws
+make exact except for a player activated mid-season.
+
+Each sync holds our season Max PF up against Sleeper's own `ppts` and logs any
+disagreement over a cent, and stores Sleeper's running season total per week in
+`kv` so its *weekly* Max PF can be recovered as the difference between two
+weeks. `npm run maxpf:verify` prints the lot side by side.
+
+A week goes final the Tuesday morning after its Monday-night game, but Sleeper's
+numbers aren't settled then — Monday-night scoring and stat corrections arrive
+for days — so the incremental sync keeps re-pulling a final week until the
+Friday after it, then leaves it alone.
 
 ### Roster ids are season-scoped
 
@@ -143,7 +183,8 @@ matchup records, which Sleeper does not rewrite.
 | `npm run db:migrate` | Apply SQLite migrations, print schema summary |
 | `npm run leagues:discover -- --username <name>` | List your Sleeper leagues + IDs |
 | `npm run sync:backfill -- --league <slug\|all> [--force]` | Full historical ingest |
-| `npm run sync:incremental` | Current-season refresh |
+| `npm run sync:incremental [-- --players]` | Current-season refresh; `--players` forces a player-dictionary refresh |
 | `npm run trades:audit [-- --league <slug>] [-- --trade <id>]` | Check trades are attributed to the manager who owned that roster slot that season |
+| `npm run maxpf:verify [-- --league <slug> --season <yr> --week <n>]` | Print our Max PF next to Sleeper's own figures |
 | `npm test` | Vitest |
 | `npm run lint` | ESLint |

@@ -11,6 +11,9 @@
  *   GET /api/leagues/:slug/managers            career table (= standings)
  *   GET /api/leagues/:slug/managers/:userId    one manager's profile
  *   GET /api/leagues/:slug/rookie-draft-order  projected rookie draft order (dynasty)
+ *   GET /api/leagues/:slug/max-pf/weeks        finished season/week pairs
+ *   GET /api/leagues/:slug/max-pf/:season      season Max PF summary
+ *   GET /api/leagues/:slug/max-pf/:season/:wk  one week's best lineups
  *   GET /api/leagues/:slug/live/{league,users,rosters,matchups/:week}
  *
  * `:slug` is validated against config by `requireLeagueAccess` (mounted in
@@ -41,6 +44,7 @@ import { getDraftBoard, getDraftSeasons } from '../analytics/drafts.js'
 import { getMatchupWeeks, getWeekMatchups } from '../analytics/matchups.js'
 import { getBracketSeasons, getSeasonBracket } from '../analytics/brackets.js'
 import { getRookieDraftOrder } from '../analytics/rookieDraftOrder.js'
+import { getMaxPfSeason, getMaxPfWeek, getMaxPfWeeks } from '../analytics/maxPf.js'
 import { log } from '../log.js'
 
 const router = Router({ mergeParams: true })
@@ -143,6 +147,49 @@ router.get('/brackets/:season', (req, res) => {
   const view = getSeasonBracket(getDb(), params(req).slug, season)
   if (!view) {
     res.status(404).json({ error: 'no bracket on record for that season' })
+    return
+  }
+  res.json(view)
+})
+
+// ── Max PF ───────────────────────────────────────────────────────────────────
+
+/** `?taxi=0` drops each week's taxi squad; anything else keeps it (Sleeper's own basis). */
+function includeTaxi(req: Request): boolean {
+  const raw = req.query.taxi
+  return !(raw === '0' || raw === 'false')
+}
+
+router.get('/max-pf/weeks', (req, res) => {
+  res.json(getMaxPfWeeks(getDb(), params(req).slug))
+})
+
+router.get('/max-pf/:season', (req, res) => {
+  const season = Number(params(req).season)
+  if (!Number.isInteger(season)) {
+    res.status(400).json({ error: 'season must be an integer' })
+    return
+  }
+  const view = getMaxPfSeason(getDb(), params(req).slug, season, { includeTaxi: includeTaxi(req) })
+  if (!view) {
+    res.status(404).json({ error: 'no finished weeks on record for that season' })
+    return
+  }
+  res.json(view)
+})
+
+router.get('/max-pf/:season/:week', (req, res) => {
+  const season = Number(params(req).season)
+  const week = Number(params(req).week)
+  if (!Number.isInteger(season) || !Number.isInteger(week)) {
+    res.status(400).json({ error: 'season and week must be integers' })
+    return
+  }
+  const view = getMaxPfWeek(getDb(), params(req).slug, season, week, {
+    includeTaxi: includeTaxi(req),
+  })
+  if (!view) {
+    res.status(404).json({ error: 'that week has not finished, or is not on record' })
     return
   }
   res.json(view)

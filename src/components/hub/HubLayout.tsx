@@ -28,6 +28,7 @@ function tabsFor(meta: LeagueMeta): Tab[] {
     { to: 'standings', label: 'Standings' },
     { to: 'history', label: 'History' },
     { to: 'matchups', label: 'Matchups' },
+    { to: 'max-pf', label: 'Max PF' },
     { to: 'head-to-head', label: 'Head-to-Head' },
     { to: 'records', label: 'Records' },
     { to: 'power-rankings', label: 'Power' },

@@ -5,6 +5,12 @@
  *   Group 2 — playoff teams that don't finish in the money, reverse Max PF
  *   Group 3 — money finishers, reverse payout order (champion → last pick)
  *
+ * While the season is in progress there are no money finishers yet, so the
+ * projection assumes the playoffs go chalk — the higher seed wins every game.
+ * That puts the whole playoff field in reverse seed order: the 6 seed at 1.07
+ * through the 1 seed, as champion, at 1.12. Reverse Max PF only decides groups
+ * 2 and 3 once the season is complete and the real finishes are known.
+ *
  * Linear format: every round repeats the round-1 order, then each pick goes to
  * whoever currently owns it (traded_pick).
  *
@@ -113,7 +119,12 @@ export function computeDraftOrder(teams: readonly DraftTeam[], opts: OrderOption
   const moneyPlace = new Map(money.map((m) => [m.team.rosterId, m.place]))
 
   const group1 = order.filter((t) => !seedOf.has(t.rosterId)).sort(byReverseMaxPf)
-  const group2 = field.filter((t) => !moneyPlace.has(t.rosterId)).sort(byReverseMaxPf)
+  const nonMoneyField = field.filter((t) => !moneyPlace.has(t.rosterId))
+  // Chalk: a projected playoff exit is decided by seed, not by Max PF. The
+  // bylaws' reverse-Max-PF tiebreak is for teams that really did go out.
+  const group2 = opts.useFinalRanks
+    ? nonMoneyField.sort(byReverseMaxPf)
+    : nonMoneyField.sort((a, b) => (seedOf.get(b.rosterId) ?? 0) - (seedOf.get(a.rosterId) ?? 0))
   const group3 = [...money].sort((a, b) => b.place - a.place).map((m) => m.team)
 
   const out: OrderedTeam[] = []
@@ -280,17 +291,26 @@ export function getRookieDraftOrder(db: DB, slug: string, now = Date.now()): Roo
   if (games.length === 0) return base
 
   const rosterPositions = parseJson<string[]>(target.roster_positions_json, [])
+  // `fantasy_positions` rather than the headline position: a DB/WR fills a WR
+  // slot in Sleeper's own Max PF (see optimalLineup.ts).
   const positions = new Map(
     (
       db
         .prepare(
-          `SELECT p.player_id, p.position FROM player p
+          `SELECT p.player_id, p.position, p.fantasy_positions_json FROM player p
            WHERE p.player_id IN (
              SELECT DISTINCT j.value FROM matchup m, json_each(m.players_json) j
              WHERE m.league_id = ? AND m.week <= ? AND m.players_json IS NOT NULL)`,
         )
-        .all(leagueId, throughWeek) as { player_id: string; position: string | null }[]
-    ).map((r) => [r.player_id, r.position]),
+        .all(leagueId, throughWeek) as {
+        player_id: string
+        position: string | null
+        fantasy_positions_json: string | null
+      }[]
+    ).map((r) => [
+      r.player_id,
+      { position: r.position, positions: parseJson<string[] | null>(r.fantasy_positions_json, null) },
+    ]),
   )
 
   const teamRows = db
@@ -341,7 +361,12 @@ export function getRookieDraftOrder(db: DB, slug: string, now = Date.now()): Roo
     const pts = parseJson<Record<string, number | null>>(g.players_points_json, {})
     const optimal = optimalLineupPoints(
       rosterPositions,
-      ids.map((id) => ({ position: positions.get(id) ?? null, points: pts[id] ?? 0 })),
+      ids.map((id) => ({
+        playerId: id,
+        position: positions.get(id)?.position ?? null,
+        positions: positions.get(id)?.positions ?? null,
+        points: pts[id] ?? 0,
+      })),
     )
     // Max PF can never be below what was actually scored (guards weeks whose
     // per-player scores Sleeper lost — see matchup.data_quality).

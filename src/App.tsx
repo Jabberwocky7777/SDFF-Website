@@ -22,6 +22,7 @@ import LeagueOverview from '@/pages/hub/LeagueOverview'
 import HubStandings from '@/pages/hub/HubStandings'
 import HubHistory from '@/pages/hub/HubHistory'
 import HubMatchups from '@/pages/hub/HubMatchups'
+import HubMaxPf from '@/pages/hub/HubMaxPf'
 import HubHeadToHead from '@/pages/hub/HubHeadToHead'
 import HubHeadToHeadGame from '@/pages/hub/HubHeadToHeadGame'
 import HubRecords from '@/pages/hub/HubRecords'
@@ -117,6 +118,7 @@ function AppRoutes() {
             <Route path="standings" element={<HubStandings />} />
             <Route path="history" element={<HubHistory />} />
             <Route path="matchups" element={<HubMatchups />} />
+            <Route path="max-pf" element={<HubMaxPf />} />
             <Route path="head-to-head" element={<HubHeadToHead />} />
             <Route path="head-to-head/:userA/vs/:userB" element={<HubHeadToHeadGame />} />
             <Route path="records" element={<HubRecords />} />

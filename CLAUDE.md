@@ -42,6 +42,9 @@ once into the DB on a fresh install (`server/config/bootstrap.ts`), then ignored
   request's `:slug` against the registry before touching Sleeper.
 - Analytics live in `server/analytics/` as pure functions over query results,
   so they can be unit-tested without a network or DB.
+- Max PF counts every rostered player, taxi and IR included, because Sleeper's
+  own `ppts` does. Taxi-excluded figures come from `roster_week_status`, never
+  from a roster's current taxi list — that only describes today.
 - A Sleeper `roster_id` is only meaningful within one league-season. Map roster
   -> manager by joining `team_season` on that same `league_id`; never carry a
   roster id across seasons (managers swap slots, and Sleeper reports a past
@@ -66,6 +69,7 @@ npm run leagues:discover -- --username <sleeper_username>
 npm run sync:backfill -- --league <slug|all>
 npm run sync:incremental
 npm run trades:audit         # verify trade manager attribution
+npm run maxpf:verify         # our Max PF vs Sleeper's own figures
 npm test                 # Vitest
 npm run typecheck        # tsc --noEmit on the frontend (vite build does not)
 ```

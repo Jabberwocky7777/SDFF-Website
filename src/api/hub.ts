@@ -594,6 +594,105 @@ export const getMatchupWeeks = (slug: string) =>
 export const getWeekMatchups = (slug: string, season: number, week: number) =>
   hubFetch<WeekView>(`/leagues/${slug}/matchups/${season}/${week}`)
 
+// ── Max PF ──────────────────────────────────────────────────────────────────
+
+export interface MaxPfSeasonWeeks {
+  season: number
+  /** Finished weeks only. */
+  weeks: number[]
+  playoffWeekStart: number | null
+}
+
+export interface MaxPfLineupSlot {
+  slot: string
+  playerId: string | null
+  playerName: string | null
+  position: string | null
+  nflTeam: string | null
+  points: number
+  startedActually: boolean
+  status: 'taxi' | 'ir' | null
+}
+
+export interface MaxPfBenchedStarter {
+  playerId: string
+  playerName: string | null
+  position: string | null
+  nflTeam: string | null
+  points: number
+}
+
+export interface MaxPfTeamWeek {
+  rosterId: number
+  userId: string | null
+  name: string
+  teamName: string | null
+  /** Sleeper avatar id — pass through avatarUrl(). */
+  avatar: string | null
+  actual: number
+  max: number
+  /** actual / max, 0–1. */
+  efficiency: number
+  leftOnBench: number
+  bestLineup: MaxPfLineupSlot[]
+  shouldHaveSat: MaxPfBenchedStarter[]
+}
+
+export interface MaxPfBlunder {
+  rosterId: number
+  userId: string | null
+  name: string
+  week: number
+  leftOnBench: number
+  actual: number
+  max: number
+}
+
+export interface MaxPfWeekView {
+  season: number
+  week: number
+  taxiIncluded: boolean
+  /** This week's taxi record was inferred from the current taxi squads. */
+  taxiInferred: boolean
+  hasTaxiSquad: boolean
+  teams: MaxPfTeamWeek[]
+  blunder: MaxPfBlunder | null
+}
+
+export interface MaxPfSeasonTeam {
+  rosterId: number
+  userId: string | null
+  name: string
+  teamName: string | null
+  avatar: string | null
+  weeks: number
+  actual: number
+  max: number
+  efficiency: number
+  leftOnBench: number
+}
+
+export interface MaxPfSeasonView {
+  season: number
+  taxiIncluded: boolean
+  hasTaxiSquad: boolean
+  weeks: number[]
+  taxiInferred: boolean
+  teams: MaxPfSeasonTeam[]
+  blunder: MaxPfBlunder | null
+}
+
+const taxiQuery = (includeTaxi: boolean) => (includeTaxi ? '' : '?taxi=0')
+
+export const getMaxPfWeeks = (slug: string) =>
+  hubFetch<MaxPfSeasonWeeks[]>(`/leagues/${slug}/max-pf/weeks`)
+
+export const getMaxPfWeek = (slug: string, season: number, week: number, includeTaxi: boolean) =>
+  hubFetch<MaxPfWeekView>(`/leagues/${slug}/max-pf/${season}/${week}${taxiQuery(includeTaxi)}`)
+
+export const getMaxPfSeason = (slug: string, season: number, includeTaxi: boolean) =>
+  hubFetch<MaxPfSeasonView>(`/leagues/${slug}/max-pf/${season}${taxiQuery(includeTaxi)}`)
+
 // ── Playoff brackets ────────────────────────────────────────────────────────
 
 export interface BracketTeam {

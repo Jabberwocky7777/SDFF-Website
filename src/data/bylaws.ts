@@ -89,7 +89,7 @@ export const bylawsSections: BylawsSection[] = [
     items: [
       {
         question: 'How is the rookie draft order determined?',
-        answer: 'Picks 1–9: Reverse Max Points For (MPF) — the team with the lowest MPF gets the first pick. Picks 10–12: Reverse payout order (3rd place picks 10th, runner-up picks 11th, champion picks 12th).',
+        answer: 'Picks 1–6: non-playoff teams, reverse Max Points For (MPF) — the team with the lowest MPF gets the first pick. Picks 7–9: playoff teams that did not earn money, reverse MPF. Picks 10–12: reverse payout order (3rd place picks 10th, runner-up picks 11th, champion picks 12th). The site’s in-season projection assumes chalk playoffs — the higher seed wins every game — so until the playoffs are played the whole field sits in reverse seed order.',
       },
       {
         question: 'Why reverse MPF instead of reverse record?',
@@ -101,7 +101,7 @@ export const bylawsSections: BylawsSection[] = [
       },
       {
         question: 'How many rounds is the rookie draft?',
-        answer: '4 rounds. Order follows the reverse MPF structure above for each round.',
+        answer: '4 rounds, linear — every round repeats round 1’s order.',
       },
     ],
   },
