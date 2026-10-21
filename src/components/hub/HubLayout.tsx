@@ -28,7 +28,6 @@ function tabsFor(meta: LeagueMeta): Tab[] {
     { to: 'standings', label: 'Standings' },
     { to: 'history', label: 'History' },
     { to: 'matchups', label: 'Matchups' },
-    { to: 'max-pf', label: 'Max PF' },
     { to: 'head-to-head', label: 'Head-to-Head' },
     { to: 'records', label: 'Records' },
     { to: 'power-rankings', label: 'Power' },
@@ -39,6 +38,9 @@ function tabsFor(meta: LeagueMeta): Tab[] {
   ]
   if (meta.type === 'dynasty') {
     tabs.push(
+      // Max PF is what sets the rookie draft order, so it belongs with the
+      // dynasty tabs even though the page itself would read fine anywhere.
+      { to: 'max-pf', label: 'Max PF' },
       { to: 'draft-order', label: 'Draft Order' },
       { to: 'picks', label: 'Rookie Picks' },
       { to: 'dues', label: 'Dues' },

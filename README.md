@@ -114,8 +114,8 @@ src/
   components/ErrorBoundary.tsx
   pages/AdminSettings    league + account management + sync/backup status
   pages/hub/             Overview, Standings, History (+ playoff brackets), Matchups,
-                         MaxPf, HeadToHead, Records, Power, Managers, Trades, Drafts,
-                         RookieDraftOrder (dynasty)
+                         HeadToHead, Records, Power, Managers, Trades, Drafts,
+                         MaxPf + RookieDraftOrder (dynasty)
   pages/hub/ScrollTable  shared frame for the wide tables (bleed + sticky headers)
   pages/                 in-league pages: Rosters, Dues, Picks, Bylaws, Timeline, …
 ```

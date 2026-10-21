@@ -118,7 +118,6 @@ function AppRoutes() {
             <Route path="standings" element={<HubStandings />} />
             <Route path="history" element={<HubHistory />} />
             <Route path="matchups" element={<HubMatchups />} />
-            <Route path="max-pf" element={<HubMaxPf />} />
             <Route path="head-to-head" element={<HubHeadToHead />} />
             <Route path="head-to-head/:userA/vs/:userB" element={<HubHeadToHeadGame />} />
             <Route path="records" element={<HubRecords />} />
@@ -134,6 +133,7 @@ function AppRoutes() {
             <Route path="draft" element={<HubDrafts />} />
 
             {/* Dynasty only */}
+            <Route path="max-pf" element={<DynastyOnly><HubMaxPf /></DynastyOnly>} />
             <Route path="draft-order" element={<DynastyOnly><HubRookieDraftOrder /></DynastyOnly>} />
             <Route path="picks" element={<DynastyOnly><Picks /></DynastyOnly>} />
             <Route path="dues" element={<DynastyOnly><Dues /></DynastyOnly>} />

@@ -11,7 +11,7 @@
  *   GET /api/leagues/:slug/managers            career table (= standings)
  *   GET /api/leagues/:slug/managers/:userId    one manager's profile
  *   GET /api/leagues/:slug/rookie-draft-order  projected rookie draft order (dynasty)
- *   GET /api/leagues/:slug/max-pf/weeks        finished season/week pairs
+ *   GET /api/leagues/:slug/max-pf/weeks        finished season/week pairs (dynasty)
  *   GET /api/leagues/:slug/max-pf/:season      season Max PF summary
  *   GET /api/leagues/:slug/max-pf/:season/:wk  one week's best lineups
  *   GET /api/leagues/:slug/live/{league,users,rosters,matchups/:week}
@@ -160,11 +160,24 @@ function includeTaxi(req: Request): boolean {
   return !(raw === '0' || raw === 'false')
 }
 
+/**
+ * Max PF reads fine for any format, but it's what the dynasty bylaws use to
+ * set the rookie draft order, so it ships as a dynasty tab — and the API is
+ * gated to match, the same way /rookie-draft-order is.
+ */
+function requireDynasty(req: Request, res: express.Response): boolean {
+  if (getLeague(params(req).slug)!.type === 'dynasty') return true
+  res.status(404).json({ error: 'Max PF is a dynasty-league feature' })
+  return false
+}
+
 router.get('/max-pf/weeks', (req, res) => {
+  if (!requireDynasty(req, res)) return
   res.json(getMaxPfWeeks(getDb(), params(req).slug))
 })
 
 router.get('/max-pf/:season', (req, res) => {
+  if (!requireDynasty(req, res)) return
   const season = Number(params(req).season)
   if (!Number.isInteger(season)) {
     res.status(400).json({ error: 'season must be an integer' })
@@ -179,6 +192,7 @@ router.get('/max-pf/:season', (req, res) => {
 })
 
 router.get('/max-pf/:season/:week', (req, res) => {
+  if (!requireDynasty(req, res)) return
   const season = Number(params(req).season)
   const week = Number(params(req).week)
   if (!Number.isInteger(season) || !Number.isInteger(week)) {
