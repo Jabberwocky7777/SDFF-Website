@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyWeek, type QualityCandidate } from './dataQuality.js'
+import { classifyWeek, compareMaxPf, sleeperMaxPf, type QualityCandidate } from './dataQuality.js'
 
 /** A normal nine-man lineup that scored `points`. */
 function healthy(points: number): QualityCandidate {
@@ -71,5 +71,56 @@ describe('classifyWeek', () => {
     // to compare against, the ratio test keeps them.
     const flags = classifyWeek([placeholderSlots(6), placeholderSlots(7)])
     expect(flags).toEqual([null, null])
+  })
+})
+
+describe('sleeperMaxPf', () => {
+  it('rejoins the whole points and the decimals', () => {
+    expect(sleeperMaxPf({ ppts: 1244, ppts_decimal: 12 })).toBeCloseTo(1244.12)
+    expect(sleeperMaxPf({ ppts: 988 })).toBe(988)
+  })
+
+  it('is null when Sleeper reports no ppts at all', () => {
+    expect(sleeperMaxPf({})).toBeNull()
+    expect(sleeperMaxPf(null)).toBeNull()
+  })
+})
+
+describe('compareMaxPf', () => {
+  const sleeper = new Map([
+    [1, 1244.12],
+    [2, 1196.36],
+    [3, 991.32],
+  ])
+
+  it('says nothing when every roster agrees to the cent', () => {
+    expect(compareMaxPf(new Map(sleeper), sleeper)).toEqual([])
+  })
+
+  it('tolerates a cent of float drift', () => {
+    const ours = new Map([...sleeper, [1, 1244.125]])
+    expect(compareMaxPf(ours, sleeper)).toEqual([])
+  })
+
+  it('reports the rosters that disagree, worst first', () => {
+    const ours = new Map([
+      [1, 1234.12],
+      [2, 1196.36],
+      [3, 1011.32],
+    ])
+    expect(compareMaxPf(ours, sleeper)).toEqual([
+      { rosterId: 3, ours: 1011.32, sleeper: 991.32, diff: 20 },
+      { rosterId: 1, ours: 1234.12, sleeper: 1244.12, diff: -10 },
+    ])
+  })
+
+  it('reports a roster we have no number for at all', () => {
+    expect(compareMaxPf(new Map(), new Map([[7, 100]]))).toEqual([
+      { rosterId: 7, ours: 0, sleeper: 100, diff: -100 },
+    ])
+  })
+
+  it('ignores a roster Sleeper has no number for', () => {
+    expect(compareMaxPf(new Map([[7, 100]]), new Map())).toEqual([])
   })
 })

@@ -56,14 +56,24 @@ describe('seedOrder', () => {
 })
 
 describe('computeDraftOrder', () => {
-  it('projects money finishes by seed while the season is in progress', () => {
+  it('projects a chalk playoff while the season is in progress', () => {
     const order = computeDraftOrder(twelveTeams(), opts)
-    // Group 1 (non-playoff) by reverse Max PF, group 2 (seeds 4–6) by reverse
-    // Max PF, group 3 = seeds 3, 2, 1 — the 1 seed picks last.
-    expect(slots(order)).toEqual([10, 12, 7, 11, 6, 8, 5, 4, 9, 3, 2, 1])
+    // Group 1 (non-playoff) by reverse Max PF; then the whole playoff field in
+    // reverse seed order — the 6 seed (r9) at 1.07, the 1 seed last.
+    expect(slots(order)).toEqual([10, 12, 7, 11, 6, 8, 9, 5, 4, 3, 2, 1])
     expect(order.map((t) => t.group)).toEqual([1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3])
     expect(order[11]).toMatchObject({ rosterId: 1, slot: 12, seed: 1, moneyPlace: 1 })
+    expect(order[6]).toMatchObject({ rosterId: 9, slot: 7, seed: 6, moneyPlace: null })
     expect(order[0]).toMatchObject({ rosterId: 10, slot: 1, seed: null, moneyPlace: null })
+  })
+
+  it('ignores Max PF inside the projected playoff field', () => {
+    // r4 has a much higher Max PF than r5, but it is seeded above it, so chalk
+    // still has r4 going further and picking later.
+    const teams = twelveTeams()
+    teams[3].maxPointsFor = 2000
+    const order = computeDraftOrder(teams, opts)
+    expect(slots(order).slice(6, 9)).toEqual([9, 5, 4])
   })
 
   it('uses actual final ranks once the season is complete', () => {
@@ -84,6 +94,66 @@ describe('computeDraftOrder', () => {
     const teams = twelveTeams()
     teams[9].maxPointsFor = teams[11].maxPointsFor // r10 ties r12; r12 scored less
     expect(slots(computeDraftOrder(teams, opts)).slice(0, 2)).toEqual([12, 10])
+  })
+})
+
+// ── The real thing: SDFF 2026 through week 6 ─────────────────────────────────
+
+/**
+ * Season Max PF per Sleeper's `ppts` (taxi included) after week 6, with
+ * records and PF chosen to reproduce the seeding the league actually had:
+ * Drako, Tedsticles and Tate are all 8-4 and break their tie on points for,
+ * and The Library takes the 6 seed on points at 6-6.
+ */
+const SDFF_WK6: Array<[string, number, number, number, number]> = [
+  // name, wins, losses, pointsFor, maxPointsFor
+  ['The Commish', 9, 3, 1010, 1196.36],
+  ['Drop a Drako', 8, 4, 1000, 1244.12],
+  ['Tedsticles', 8, 4, 990, 1177.5],
+  ['Jaxson (Tate)', 8, 4, 980, 1109.3],
+  ['philiphusney', 7, 5, 960, 1155.12],
+  ['The Library', 6, 6, 975, 1184.18],
+  ['1 Wilson 1 Cup', 6, 6, 900, 1125.26],
+  ['WBoyette', 5, 7, 870, 1080.54],
+  ['Jacory in the House', 4, 8, 840, 1030.78],
+  ['NineMonkeys', 4, 8, 830, 991.32],
+  ['Tank for Jeremiah', 3, 9, 800, 988.92],
+  ['Jeremiyah Loves Trains', 2, 10, 760, 914.16],
+]
+
+describe('SDFF 2026 chalk projection after week 6', () => {
+  const teams: DraftTeam[] = SDFF_WK6.map(([name, wins, losses, pointsFor, maxPointsFor], i) => ({
+    rosterId: i + 1,
+    userId: `U${i + 1}`,
+    name,
+    teamName: null,
+    wins,
+    losses,
+    ties: 0,
+    pointsFor,
+    maxPointsFor,
+    finalRank: null,
+  }))
+
+  it('matches the order the league expects', () => {
+    const order = computeDraftOrder(teams, opts)
+    expect(order.map((t) => t.name)).toEqual([
+      'Jeremiyah Loves Trains',
+      'Tank for Jeremiah',
+      'NineMonkeys',
+      'Jacory in the House',
+      'WBoyette',
+      '1 Wilson 1 Cup',
+      'The Library',
+      'philiphusney',
+      'Jaxson (Tate)',
+      'Tedsticles',
+      'Drop a Drako',
+      'The Commish',
+    ])
+    // 1.07 is the points seed; 1.12 is the projected champion.
+    expect(order[6]).toMatchObject({ slot: 7, seed: 6, group: 2 })
+    expect(order[11]).toMatchObject({ slot: 12, seed: 1, moneyPlace: 1, group: 3 })
   })
 })
 

@@ -55,3 +55,48 @@ export function classifyWeek(candidates: QualityCandidate[]): Array<DataQuality 
     c.points != null && lineupLooksStripped(c) && c.points < 0.25 * best ? 'unscored' : null,
   )
 }
+
+// ── Max PF cross-check against Sleeper ───────────────────────────────────────
+
+/**
+ * Sleeper's own season Max PF for a roster, out of `roster.settings`. It stores
+ * the whole-point part and the decimals separately.
+ */
+export function sleeperMaxPf(settings: Record<string, number> | null | undefined): number | null {
+  const s = settings ?? {}
+  if (typeof s.ppts !== 'number') return null
+  return s.ppts + (typeof s.ppts_decimal === 'number' ? s.ppts_decimal / 100 : 0)
+}
+
+export interface MaxPfMismatch {
+  rosterId: number
+  /** Our season Max PF, summed from matchup.optimal_points. */
+  ours: number
+  sleeper: number
+  diff: number
+}
+
+/**
+ * Compare our season Max PF per roster against Sleeper's `ppts`.
+ *
+ * Both are "best possible lineup from every rostered player, taxi and IR
+ * included", so they should agree to the cent; a drift means our player pool
+ * or slot eligibility is wrong, or Sleeper lost a week's per-player scores.
+ * Rosters Sleeper gives no `ppts` for are skipped rather than reported as a
+ * mismatch against zero. Returns only the rosters that disagree, worst first.
+ */
+export function compareMaxPf(
+  ours: ReadonlyMap<number, number>,
+  sleeper: ReadonlyMap<number, number>,
+  tolerance = 0.01,
+): MaxPfMismatch[] {
+  const out: MaxPfMismatch[] = []
+  for (const [rosterId, theirs] of sleeper) {
+    const mine = ours.get(rosterId) ?? 0
+    const diff = Math.round((mine - theirs) * 100) / 100
+    if (Math.abs(diff) > tolerance) {
+      out.push({ rosterId, ours: Math.round(mine * 100) / 100, sleeper: theirs, diff })
+    }
+  }
+  return out.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+}

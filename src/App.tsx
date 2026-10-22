@@ -22,6 +22,7 @@ import LeagueOverview from '@/pages/hub/LeagueOverview'
 import HubStandings from '@/pages/hub/HubStandings'
 import HubHistory from '@/pages/hub/HubHistory'
 import HubMatchups from '@/pages/hub/HubMatchups'
+import HubMaxPf from '@/pages/hub/HubMaxPf'
 import HubHeadToHead from '@/pages/hub/HubHeadToHead'
 import HubHeadToHeadGame from '@/pages/hub/HubHeadToHeadGame'
 import HubRecords from '@/pages/hub/HubRecords'
@@ -132,6 +133,7 @@ function AppRoutes() {
             <Route path="draft" element={<HubDrafts />} />
 
             {/* Dynasty only */}
+            <Route path="max-pf" element={<DynastyOnly><HubMaxPf /></DynastyOnly>} />
             <Route path="draft-order" element={<DynastyOnly><HubRookieDraftOrder /></DynastyOnly>} />
             <Route path="picks" element={<DynastyOnly><Picks /></DynastyOnly>} />
             <Route path="dues" element={<DynastyOnly><Dues /></DynastyOnly>} />

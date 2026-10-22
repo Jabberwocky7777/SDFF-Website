@@ -170,6 +170,8 @@ export interface MatchupRow {
   startersPointsJson: string | null
   playersJson: string | null
   playersPointsJson: string | null
+  /** Max PF: the best lineup available that week, taxi and IR included. */
+  optimalPoints: number | null
   /** False for a week still being played — history queries skip it. */
   isFinal: boolean
 }
@@ -180,12 +182,14 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
        league_id, week, matchup_id, roster_id, user_id, points,
        opponent_roster_id, opponent_user_id, opponent_points, result,
        is_playoff, is_consolation, median_result, data_quality,
-       starters_json, starters_points_json, players_json, players_points_json, is_final
+       starters_json, starters_points_json, players_json, players_points_json,
+       optimal_points, is_final
      ) VALUES (
        @leagueId, @week, @matchupId, @rosterId, @userId, @points,
        @opponentRosterId, @opponentUserId, @opponentPoints, @result,
        @isPlayoff, @isConsolation, @medianResult, @dataQuality,
-       @startersJson, @startersPointsJson, @playersJson, @playersPointsJson, @isFinal
+       @startersJson, @startersPointsJson, @playersJson, @playersPointsJson,
+       @optimalPoints, @isFinal
      )
      ON CONFLICT(league_id, week, roster_id) DO UPDATE SET
        matchup_id = excluded.matchup_id,
@@ -203,6 +207,7 @@ export function upsertMatchup(db: DB, row: MatchupRow): void {
        starters_points_json = excluded.starters_points_json,
        players_json = excluded.players_json,
        players_points_json = excluded.players_points_json,
+       optimal_points = excluded.optimal_points,
        is_final = excluded.is_final`,
   ).run({
     ...row,

@@ -12,9 +12,12 @@ import type { LeagueRecord } from '../config/leagues.js'
 import { walkLeagueChain } from '../sleeper/chain.js'
 import { deriveCapabilities, type LeagueCapabilities } from './capabilities.js'
 import { asRosterId, deriveFinalRanks } from './brackets.js'
-import { classifyWeek, type QualityCandidate } from './dataQuality.js'
+import { classifyWeek, compareMaxPf, sleeperMaxPf, type QualityCandidate } from './dataQuality.js'
+import { syncRosterWeekStatus, type WeekIngested } from './rosterStatus.js'
 import { syncFamilyScoring } from './playerStats.js'
-import { nflWeekFinalAt } from '../analytics/nflCalendar.js'
+import { nflWeekFinalAt, nflWeekRefreshUntil } from '../analytics/nflCalendar.js'
+import { optimalLineupPoints } from '../analytics/optimalLineup.js'
+import { log as logger } from '../log.js'
 import {
   applyManagerAliases,
   finishSyncLog,
@@ -76,10 +79,13 @@ export async function refreshPlayers(
   const now = Date.now()
 
   const stmt = db.prepare(
-    `INSERT INTO player (player_id, full_name, position, team, age, years_exp, status, updated_at)
-     VALUES (@player_id, @full_name, @position, @team, @age, @years_exp, @status, @updated_at)
+    `INSERT INTO player (player_id, full_name, position, fantasy_positions_json, team,
+                         age, years_exp, status, updated_at)
+     VALUES (@player_id, @full_name, @position, @fantasy_positions_json, @team,
+             @age, @years_exp, @status, @updated_at)
      ON CONFLICT(player_id) DO UPDATE SET
-       full_name = excluded.full_name, position = excluded.position, team = excluded.team,
+       full_name = excluded.full_name, position = excluded.position,
+       fantasy_positions_json = excluded.fantasy_positions_json, team = excluded.team,
        age = excluded.age, years_exp = excluded.years_exp, status = excluded.status,
        updated_at = excluded.updated_at`,
   )
@@ -93,6 +99,11 @@ export async function refreshPlayers(
             [p.first_name, p.last_name].filter(Boolean).join(' ')) ||
           null,
         position: (p.position as string) ?? null,
+        // Every slot he can fill, which is not always his headline position
+        // (Travis Hunter is a DB who starts at WR) — see optimalLineup.ts.
+        fantasy_positions_json: Array.isArray(p.fantasy_positions)
+          ? JSON.stringify(p.fantasy_positions)
+          : null,
         team: (p.team as string) ?? null,
         age: (p.age as number) ?? null,
         years_exp: (p.years_exp as number) ?? null,
@@ -109,6 +120,17 @@ export async function refreshPlayers(
 
 // ── Normalization helpers ────────────────────────────────────────────────────
 
+/** Sleeper's `fantasy_positions`, as stored. Null when absent or unparseable. */
+function parseJsonArray(raw: string | null): string[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : null
+  } catch {
+    return null
+  }
+}
+
 function numOrNull(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
@@ -118,6 +140,76 @@ function weeklyMedian(points: number[]): number | null {
   if (vals.length === 0) return null
   const mid = Math.floor(vals.length / 2)
   return vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid]
+}
+
+interface LineupContext {
+  rosterPositions: readonly string[]
+  positionsOf: (playerId: string) => { position: string | null; positions: string[] | null }
+}
+
+/**
+ * Max PF for one team's week: the best lineup out of *every* player on the
+ * roster, taxi and IR included, which is what Sleeper's own `ppts` counts.
+ * Null when Sleeper gave us no per-player scores to work from.
+ */
+function maxPf(
+  ids: readonly string[],
+  pts: Record<string, number | null>,
+  actual: number | null,
+  lineup: LineupContext,
+): number | null {
+  if (ids.length === 0 || lineup.rosterPositions.length === 0) return null
+  const total = optimalLineupPoints(
+    lineup.rosterPositions,
+    ids.map((id) => ({ playerId: id, ...lineup.positionsOf(id), points: pts[id] ?? 0 })),
+  )
+  // Max PF can never be below what was actually scored (guards weeks whose
+  // per-player scores Sleeper lost - see matchup.data_quality).
+  return Math.round(Math.max(total, actual ?? 0) * 100) / 100
+}
+
+/**
+ * Recompute `optimal_points` for every stored week of a league from the
+ * per-player scores we already hold — no Sleeper calls.
+ *
+ * Max PF is a function of the stored lineup plus the player dictionary, and the
+ * dictionary moves under us: a position correction, or a new column like
+ * `fantasy_positions_json`, changes the answer for weeks that went final long
+ * ago and are no longer re-fetched. Running this every sync keeps the column
+ * honest for the price of a few hundred tiny solves.
+ */
+function recomputeOptimalPoints(db: DB, leagueId: string, lineup: LineupContext): number {
+  if (lineup.rosterPositions.length === 0) return 0
+  const rows = db
+    .prepare(
+      `SELECT week, roster_id, points, optimal_points, players_json, players_points_json
+       FROM matchup WHERE league_id = ? AND players_json IS NOT NULL`,
+    )
+    .all(leagueId) as Array<{
+    week: number
+    roster_id: number
+    points: number | null
+    optimal_points: number | null
+    players_json: string
+    players_points_json: string | null
+  }>
+
+  const update = db.prepare(
+    `UPDATE matchup SET optimal_points = ? WHERE league_id = ? AND week = ? AND roster_id = ?`,
+  )
+  let changed = 0
+  const writeAll = db.transaction(() => {
+    for (const row of rows) {
+      const ids = parseJsonArray(row.players_json) ?? []
+      const pts = JSON.parse(row.players_points_json ?? '{}') as Record<string, number | null>
+      const next = maxPf(ids, pts, row.points, lineup)
+      if (next == null || next === row.optimal_points) continue
+      update.run(next, leagueId, row.week, row.roster_id)
+      changed++
+    }
+  })
+  writeAll()
+  return changed
 }
 
 interface NormalizedWeek {
@@ -135,6 +227,7 @@ function normalizeWeek(
   playoffRosterIds: Set<number>,
   capabilities: LeagueCapabilities,
   isFinal: boolean,
+  lineup: LineupContext,
 ): NormalizedWeek {
   const rows: NormalizedWeek['rows'] = []
   const playerRows: NormalizedWeek['playerRows'] = []
@@ -198,6 +291,7 @@ function normalizeWeek(
       startersPointsJson: m.starters_points ? JSON.stringify(m.starters_points) : null,
       playersJson: m.players ? JSON.stringify(m.players) : null,
       playersPointsJson: m.players_points ? JSON.stringify(m.players_points) : null,
+      optimalPoints: maxPf(m.players ?? [], m.players_points ?? {}, points, lineup),
       isFinal,
     })
     candidates.push({
@@ -296,6 +390,72 @@ function parseTrade(
   return { assets, week: txn.leg ?? null }
 }
 
+// ── Max PF cross-check ───────────────────────────────────────────────────────
+
+/** kv key holding Sleeper's season Max PF per roster as of `week` going final. */
+export function pptsSnapshotKey(leagueId: string, week: number): string {
+  return `sleeper_ppts:${leagueId}:${week}`
+}
+
+/**
+ * Hold our season Max PF up against Sleeper's `ppts` and complain about any
+ * drift, and keep a per-week snapshot of Sleeper's season totals.
+ *
+ * The snapshot is what makes Sleeper's *weekly* Max PF recoverable: Sleeper
+ * only publishes the running season figure, so week N's is the difference
+ * between the week-N and week-(N−1) snapshots. Only the newest final week's
+ * snapshot is rewritten, which lets a Tuesday value be corrected by Friday
+ * while older weeks stay frozen.
+ */
+function checkMaxPf(
+  db: DB,
+  args: {
+    leagueId: string
+    season: number
+    rosters: readonly SleeperRoster[]
+    weeks: readonly WeekIngested[]
+    log: (m: string) => void
+  },
+): void {
+  const { leagueId, season, rosters, weeks, log } = args
+
+  const sleeper = new Map<number, number>()
+  for (const r of rosters) {
+    const ppts = sleeperMaxPf(r.settings as Record<string, number> | null | undefined)
+    if (ppts != null) sleeper.set(r.roster_id, Math.round(ppts * 100) / 100)
+  }
+  if (sleeper.size === 0) return
+
+  const ours = new Map(
+    (
+      db
+        .prepare(
+          `SELECT roster_id, SUM(COALESCE(optimal_points, 0)) AS total FROM matchup
+           WHERE league_id = ? GROUP BY roster_id`,
+        )
+        .all(leagueId) as Array<{ roster_id: number; total: number }>
+    ).map((r) => [r.roster_id, r.total]),
+  )
+
+  const mismatches = compareMaxPf(ours, sleeper)
+  if (mismatches.length === 0) {
+    log(`  max pf: matches Sleeper for all ${sleeper.size} rosters`)
+  } else {
+    log(`  max pf: ${mismatches.length}/${sleeper.size} rosters disagree with Sleeper`)
+    logger.warn('max pf disagrees with sleeper', {
+      leagueId,
+      season,
+      rosters: mismatches.length,
+      worst: mismatches[0],
+    })
+  }
+
+  const lastFinal = weeks.filter((w) => w.isFinal).at(-1)?.week
+  if (lastFinal != null) {
+    setKv(db, pptsSnapshotKey(leagueId, lastFinal), JSON.stringify([...sleeper]))
+  }
+}
+
 // ── One league-season ────────────────────────────────────────────────────────
 
 async function ingestSeason(
@@ -308,6 +468,8 @@ async function ingestSeason(
     league: SleeperLeague
     seasonsAvailable: number
     isComplete: boolean
+    isCurrentSeason: boolean
+    mode: IngestOptions['mode']
     maxWeek: number
     log: (m: string) => void
   },
@@ -464,11 +626,64 @@ async function ingestSeason(
       : args.maxWeek
   const weekCeiling = Math.min(args.maxWeek, lastFantasyWeek)
 
+  // Max PF needs each player's primary position and the league's starting
+  // slots. One query for the whole dictionary beats one per week, and it is
+  // only run for seasons that actually have matchups to normalize.
+  const rosterPositions: readonly string[] = league.roster_positions ?? []
+  type Positions = { position: string | null; positions: string[] | null }
+  const NO_POSITION: Positions = { position: null, positions: null }
+  let positionCache: Map<string, Positions> | null = null
+  const positionsOf = (playerId: string): Positions => {
+    if (!positionCache) {
+      positionCache = new Map(
+        (
+          db
+            .prepare(`SELECT player_id, position, fantasy_positions_json FROM player`)
+            .all() as Array<{
+            player_id: string
+            position: string | null
+            fantasy_positions_json: string | null
+          }>
+        ).map((r) => [
+          r.player_id,
+          {
+            position: r.position,
+            positions: parseJsonArray(r.fantasy_positions_json),
+          },
+        ]),
+      )
+    }
+    return positionCache.get(playerId) ?? NO_POSITION
+  }
+
+  // Weeks already stored as final, so an incremental sync can stop re-fetching
+  // the ones whose numbers have long since settled.
+  const storedFinal = new Set(
+    (
+      db
+        .prepare(
+          `SELECT week FROM matchup WHERE league_id = ? GROUP BY week HAVING MIN(is_final) = 1`,
+        )
+        .all(leagueId) as Array<{ week: number }>
+    ).map((r) => r.week),
+  )
+
   // Matchups + weekly roster snapshots.
   let weekCount = 0
   for (let week = 1; week <= weekCeiling; week++) {
     // Judged before the fetch: scores read after the cutoff are final scores.
     const isFinal = args.isComplete || nflWeekFinalAt(season, week) <= Date.now()
+    // Monday-night points and stat corrections land for days after a week goes
+    // final, so a final week is still re-pulled until the Friday after it; past
+    // that, a week we already hold as final is left alone.
+    if (
+      args.mode === 'incremental' &&
+      isFinal &&
+      storedFinal.has(week) &&
+      Date.now() > nflWeekRefreshUntil(season, week)
+    ) {
+      continue
+    }
     const matchups = await client.getMatchups(leagueId, week)
     if (matchups.length === 0) continue
     // GOTCHA: `points` is null for weeks that never happened AND 0 for a week
@@ -486,6 +701,7 @@ async function ingestSeason(
       playoffRosterIds,
       capabilities,
       isFinal,
+      { rosterPositions, positionsOf },
     )
     const writeWeek = db.transaction(() => {
       for (const row of rows) upsertMatchup(db, row)
@@ -495,6 +711,37 @@ async function ingestSeason(
     weekCount++
   }
   log(`  matchups: ${weekCount} weeks`)
+
+  // Weeks that went final before the player dictionary last changed are no
+  // longer re-fetched, so their Max PF is refreshed from stored data instead.
+  const recomputed = recomputeOptimalPoints(db, leagueId, { rosterPositions, positionsOf })
+  if (recomputed > 0) log(`  max pf: recomputed ${recomputed} stored rows`)
+
+  // Weekly taxi / IR record, and the Max PF cross-check against Sleeper. Both
+  // read today's rosters, which only describe the season in progress.
+  if (args.isCurrentSeason && !args.isComplete) {
+    const weeks = (
+      db
+        .prepare(
+          `SELECT week, MIN(is_final) AS is_final FROM matchup
+           WHERE league_id = ? GROUP BY week ORDER BY week`,
+        )
+        .all(leagueId) as Array<{ week: number; is_final: number }>
+    ).map<WeekIngested>((r) => ({ week: r.week, isFinal: r.is_final === 1 }))
+
+    const status = syncRosterWeekStatus(db, {
+      leagueId,
+      rosters,
+      weeks,
+      hasTaxiSquad: capabilities.hasTaxiSquad,
+    })
+    log(
+      `  roster status: snapshot wk ${status.snapshotted.join(',') || '-'}` +
+        `, inferred wk ${status.inferred.join(',') || '-'}`,
+    )
+
+    checkMaxPf(db, { leagueId, season, rosters, weeks, log })
+  }
 
   // Transactions + trades. GOTCHA: offseason trades land in week 0 or 1
   // depending on timing — loop from 0 and dedupe on transaction_id (upsert).
@@ -643,6 +890,8 @@ export async function ingestFamily(
           league: seasonEntry.league,
           seasonsAvailable: chain.length,
           isComplete,
+          isCurrentSeason: seasonEntry.season === opts.currentNflSeason,
+          mode: opts.mode,
           maxWeek,
           log,
         })

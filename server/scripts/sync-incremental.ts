@@ -2,6 +2,7 @@
  * Incremental sync — current season only, all league families.
  *
  *   npm run sync:incremental
+ *   npm run sync:incremental -- --players    # force a player-dictionary refresh
  *
  * Cheap enough to run hourly (or every few minutes during games). Re-pulls the
  * live season's matchups/transactions and refreshes the player dictionary if
@@ -18,7 +19,10 @@ async function main(): Promise<void> {
   const client = getSleeperClient()
   const state = await resolveNflState(client)
 
-  await refreshPlayers(client, db, {})
+  // The dictionary is normally refreshed at most once a day; --players forces
+  // it, which is what a new player column (or a position correction) needs.
+  const forcePlayers = process.argv.slice(2).includes('--players')
+  await refreshPlayers(client, db, { force: forcePlayers })
 
   for (const entry of getLeagues()) {
     await ingestFamily(client, db, entry, {

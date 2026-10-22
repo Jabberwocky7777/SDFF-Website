@@ -71,6 +71,10 @@ export const rosterSchema = z
     co_owners: z.array(z.string()).nullable().optional(),
     players: z.array(z.string()).nullable().optional(),
     starters: z.array(z.string()).nullable().optional(),
+    /** Taxi squad. Only the *current* list — Sleeper keeps no weekly history. */
+    taxi: z.array(z.string()).nullable().optional(),
+    /** Injured reserve, same caveat as `taxi`. */
+    reserve: z.array(z.string()).nullable().optional(),
     settings: z.record(z.string(), z.number()).nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   })

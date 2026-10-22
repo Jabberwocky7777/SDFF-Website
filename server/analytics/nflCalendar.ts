@@ -31,6 +31,19 @@ export function nflWeekFinalAt(season: number, week: number): number {
 }
 
 /**
+ * How long a final week is still worth re-pulling from Sleeper.
+ *
+ * A week goes final the Tuesday morning after its Monday-night game, but
+ * Sleeper's own numbers aren't settled then: Monday-night scoring and stat
+ * corrections trickle in for days (a Tuesday-evening pull of SDFF week 6 was
+ * short by 10-40 points for several teams). Keep re-ingesting until the Friday
+ * after, then leave the week alone.
+ */
+export function nflWeekRefreshUntil(season: number, week: number): number {
+  return nflWeekFinalAt(season, week) + 3 * DAY_MS
+}
+
+/**
  * The highest week whose results are final *and* were stored after they went
  * final. `lastSyncStartedAt` is when the most recent successful sync of this
  * league-season began: data fetched before a week's cutoff may still hold
