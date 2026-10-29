@@ -22,6 +22,16 @@
  */
 import type { DB } from '../db/index.js'
 import { getFamily } from './queries.js'
+import { nyDateString } from '../lib/nyDate.js'
+import {
+  assetValue,
+  ktcBalance,
+  loadKtcContext,
+  pickKey,
+  type KtcAssetValue,
+  type KtcBalance,
+  type KtcCtx,
+} from './ktc.js'
 
 export interface SeasonLine {
   season: number
@@ -56,6 +66,11 @@ export interface TradeAssetView {
   stillRostered: boolean
   resolvedPlayerId?: string | null
   resolutionStatus?: 'resolved' | 'pending' | 'unresolved'
+  /**
+   * KTC dynasty value then vs now. Null for FAAB, for anything KTC has never
+   * ranked, and for every non-dynasty family.
+   */
+  ktc: KtcAssetValue | null
 }
 
 export interface TradeSideView {
@@ -72,6 +87,9 @@ export interface TradeSideView {
     par: number
     assetsReceived: number
     assetsStillRostered: number
+    /** Summed KTC value of this side's return, on the trade date and today. */
+    ktcAtTrade: number | null
+    ktcNow: number | null
   }
 }
 
@@ -90,6 +108,8 @@ export interface TradeView {
   headline: string
   /** Roster-week sample size the return has been measured over. */
   weeksElapsed: number
+  /** How lopsided the deal was on KTC value. Null outside dynasty. */
+  ktcBalance: KtcBalance | null
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -184,9 +204,16 @@ interface FamilyCtx {
   replacementAll: Map<string, number>
   latest: { season: number; week: number } | null
   rosteredNow: Set<string>
+  /** KTC values, loaded for the trade dates in play. Dynasty only. */
+  ktc: KtcCtx | null
 }
 
-function buildContext(db: DB, familyId: number, dynasty: boolean): FamilyCtx {
+function buildContext(
+  db: DB,
+  familyId: number,
+  dynasty: boolean,
+  tradeDates: readonly string[] = [],
+): FamilyCtx {
   const names = new Map<string, string>()
   for (const r of db
     .prepare(
@@ -292,6 +319,9 @@ function buildContext(db: DB, familyId: number, dynasty: boolean): FamilyCtx {
     replacementAll,
     latest,
     rosteredNow,
+    // KTC is a dynasty valuation. In a redraft family every asset is rented
+    // for the season, so a dynasty price tag on it would be noise.
+    ktc: dynasty ? loadKtcContext(db, tradeDates) : null,
   }
 }
 
@@ -426,6 +456,41 @@ function pickLabel(a: RawAsset): string {
   return `${a.pick_season ?? '?'} ${rd}-round pick`
 }
 
+/** 'YYYY-MM-DD' in the league's own timezone, or null if Sleeper gave no time. */
+function tradeDate(trade: RawTrade): string | null {
+  return trade.created_ms == null ? null : nyDateString(trade.created_ms)
+}
+
+/**
+ * KTC value then vs now for one asset.
+ *
+ * Picks are valued with KTC's own rookie-pick assets, which come in Early / Mid
+ * / Late tiers only. We always use **Mid**: at the moment a future pick changes
+ * hands nobody knows where it will land, and pricing it with the slot it
+ * eventually got would be hindsight dressed up as a contemporaneous value.
+ * Once the pick has been used, "now" is the player drafted with it instead.
+ */
+function ktcForAsset(
+  ctx: FamilyCtx,
+  a: RawAsset,
+  trade: RawTrade,
+  resolvedPlayerId: string | null,
+): KtcAssetValue | null {
+  const ktc = ctx.ktc
+  const date = tradeDate(trade)
+  if (!ktc || date === null || a.asset_type === 'faab') return null
+
+  if (a.asset_type === 'player') {
+    const id = a.player_id ? ktc.byPlayerId.get(a.player_id) ?? null : null
+    return assetValue(ktc, id, id, date)
+  }
+
+  if (a.pick_season == null || a.pick_round == null) return null
+  const pickId = ktc.byPick.get(pickKey(a.pick_season, a.pick_round, 'mid')) ?? null
+  const nowId = resolvedPlayerId ? ktc.byPlayerId.get(resolvedPlayerId) ?? null : pickId
+  return assetValue(ktc, pickId, nowId, date)
+}
+
 function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId: string): TradeAssetView {
   const tradeWeek = trade.is_offseason ? 1 : Math.max(1, trade.week ?? 1)
 
@@ -450,6 +515,7 @@ function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId
     weeksRostered: 0,
     weeksStarted: 0,
     stillRostered: false,
+    ktc: null,
   }
 
   let attributedPlayerId: string | null = null
@@ -484,6 +550,8 @@ function buildAsset(db: DB, ctx: FamilyCtx, trade: RawTrade, a: RawAsset, userId
     base.stillRostered = ctx.rosteredNow.has(`${userId}:${attributedPlayerId}`)
   }
 
+  base.ktc = ktcForAsset(ctx, a, trade, base.resolvedPlayerId ?? null)
+
   return base
 }
 
@@ -502,13 +570,32 @@ function buildView(db: DB, ctx: FamilyCtx, trade: RawTrade): TradeView {
     if (a.from_user_id) userIds.add(a.from_user_id)
   }
 
-  const sides: TradeSideView[] = [...userIds].map((userId) => {
-    const received = assets
+  const sidesReceived = [...userIds].map((userId) => ({
+    userId,
+    received: assets
       .filter((a) => a.to_user_id === userId)
-      .map((a) => buildAsset(db, ctx, trade, a, userId))
+      .map((a) => buildAsset(db, ctx, trade, a, userId)),
+  }))
 
+  // One balance pass over the whole trade, so a 3-team deal is measured as the
+  // spread across every side rather than as a pair of differences.
+  const balance =
+    ctx.ktc === null
+      ? null
+      : ktcBalance(
+          sidesReceived.map((s) => ({
+            userId: s.userId,
+            assets: s.received.map((r) => r.ktc),
+          })),
+        )
+  const ktcTotals = new Map(
+    (balance?.sides ?? []).map((s) => [s.userId, { atTrade: s.atTrade, now: s.now }]),
+  )
+
+  const sides: TradeSideView[] = sidesReceived.map(({ userId, received }) => {
     const bySeason = mergeSeasons(received.map((r) => r.bySeason))
     const g = grandTotals(bySeason)
+    const ktcTotal = ktcTotals.get(userId) ?? null
 
     return {
       userId,
@@ -523,6 +610,8 @@ function buildView(db: DB, ctx: FamilyCtx, trade: RawTrade): TradeView {
         par: round2(g.par),
         assetsReceived: received.length,
         assetsStillRostered: received.filter((r) => r.stillRostered).length,
+        ktcAtTrade: ktcTotal?.atTrade ?? null,
+        ktcNow: ktcTotal?.now ?? null,
       },
     }
   })
@@ -557,6 +646,7 @@ function buildView(db: DB, ctx: FamilyCtx, trade: RawTrade): TradeView {
     netStartedDiff,
     headline,
     weeksElapsed,
+    ktcBalance: balance,
   }
 }
 
@@ -573,7 +663,6 @@ export function getTradeFeed(
 ): TradeView[] {
   const family = getFamily(db, slug)
   if (!family) return []
-  const ctx = buildContext(db, family.id, isDynasty(family.league_type))
 
   const params: unknown[] = [family.id]
   let where = 'family_id = ?'
@@ -587,6 +676,15 @@ export function getTradeFeed(
        FROM trade WHERE ${where} ORDER BY COALESCE(created_ms, 0) DESC, season DESC`,
     )
     .all(...params) as RawTrade[]
+
+  // The KTC lookup only loads the dates it is asked about, so the trades have
+  // to be in hand before the context is built.
+  const ctx = buildContext(
+    db,
+    family.id,
+    isDynasty(family.league_type),
+    trades.map(tradeDate).filter((d): d is string => d !== null),
+  )
 
   let views = trades.map((t) => buildView(db, ctx, t))
   if (opts.userId) views = views.filter((v) => v.sides.some((s) => s.userId === opts.userId))
@@ -604,5 +702,7 @@ export function getTradeDetail(db: DB, slug: string, tradeId: string): TradeView
     )
     .get(tradeId, family.id) as RawTrade | undefined
   if (!trade) return null
-  return buildView(db, buildContext(db, family.id, isDynasty(family.league_type)), trade)
+  const date = tradeDate(trade)
+  const ctx = buildContext(db, family.id, isDynasty(family.league_type), date ? [date] : [])
+  return buildView(db, ctx, trade)
 }
