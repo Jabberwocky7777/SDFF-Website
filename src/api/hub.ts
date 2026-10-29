@@ -389,6 +389,47 @@ export interface SeasonLine {
   weeksStarted: number
 }
 
+/**
+ * KeepTradeCut dynasty value then vs now, for one asset. Null for FAAB, for
+ * anything KTC has never ranked, and for every redraft league.
+ *
+ * Values are plain **superflex**, not TE-premium: KTC publishes no TEP history
+ * to pair a TEP "now" against. `atTradeDate` is the date the "then" figure was
+ * actually read from — KTC skips the odd day, and we slide back a little rather
+ * than ever substituting today's number.
+ */
+export interface KtcAssetValue {
+  atTrade: number | null
+  atTradeDate: string | null
+  now: number | null
+  nowDate: string | null
+  change: number | null
+  changePct: number | null
+}
+
+export type KtcBalanceLabel = 'even' | 'slight' | 'clear' | 'lopsided'
+
+export interface KtcSideTotal {
+  userId: string
+  atTrade: number | null
+  now: number | null
+  valued: number
+  missingAtTrade: number
+}
+
+export interface KtcBalance {
+  sides: KtcSideTotal[]
+  gapAtTrade: number | null
+  gapPctAtTrade: number | null
+  label: KtcBalanceLabel | null
+  gapNow: number | null
+  gapPctNow: number | null
+  labelNow: KtcBalanceLabel | null
+  favoredUserId: string | null
+  /** At least one asset could not be priced, so the split is partial. */
+  incomplete: boolean
+}
+
 export interface TradeAssetView {
   type: 'player' | 'pick' | 'faab'
   playerId: string | null
@@ -407,6 +448,7 @@ export interface TradeAssetView {
   stillRostered: boolean
   resolvedPlayerId?: string | null
   resolutionStatus?: 'resolved' | 'pending' | 'unresolved'
+  ktc: KtcAssetValue | null
 }
 
 export interface TradeSideView {
@@ -422,6 +464,8 @@ export interface TradeSideView {
     par: number
     assetsReceived: number
     assetsStillRostered: number
+    ktcAtTrade: number | null
+    ktcNow: number | null
   }
 }
 
@@ -438,6 +482,7 @@ export interface TradeView {
   netStartedDiff: number
   headline: string
   weeksElapsed: number
+  ktcBalance: KtcBalance | null
 }
 
 export const getTrades = (slug: string, opts: { season?: number; userId?: string } = {}) => {

@@ -6,6 +6,7 @@ import { getTrades, type TradeView } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
 import { fmtSigned } from '@/lib/formatters'
+import { BalanceBadge } from './tradeKtc'
 
 function tradeDate(t: TradeView): string {
   if (t.date) {
@@ -77,22 +78,25 @@ export default function HubTrades() {
             to={`/l/${slug}/trades/${t.id}`}
             className="block bg-surface border border-borderLow rounded-lg p-4 hover:border-border transition-colors"
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <span className="text-label text-muted uppercase tracking-[0.05em] font-semibold">
                 {tradeDate(t)}
                 {t.isOffseason && ' · offseason'}
               </span>
-              {t.weeksElapsed > 0 && t.sides.length === 2 && (
-                <span
-                  className={`font-mono text-small font-semibold ${
-                    Math.abs(t.netStartedDiff) < 1
-                      ? 'text-mutedLow'
-                      : 'text-gold'
-                  }`}
-                >
-                  {fmtSigned(t.netStartedDiff)} pts
-                </span>
-              )}
+              <span className="flex items-center gap-2">
+                <BalanceBadge balance={t.ktcBalance} />
+                {t.weeksElapsed > 0 && t.sides.length === 2 && (
+                  <span
+                    className={`font-mono text-small font-semibold ${
+                      Math.abs(t.netStartedDiff) < 1
+                        ? 'text-mutedLow'
+                        : 'text-gold'
+                    }`}
+                  >
+                    {fmtSigned(t.netStartedDiff)} pts
+                  </span>
+                )}
+              </span>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

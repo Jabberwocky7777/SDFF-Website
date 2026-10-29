@@ -18,6 +18,11 @@ export function fmtSigned(n: number, digits = 1): string {
   return n > 0 ? `+${v}` : v
 }
 
+/** KeepTradeCut values are 0–9999 and read best with a thousands separator. */
+export function fmtKtc(value: number): string {
+  return Math.round(value).toLocaleString()
+}
+
 export function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100

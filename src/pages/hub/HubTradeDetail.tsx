@@ -4,7 +4,8 @@ import { useHub } from '@/components/hub/HubLayout'
 import { getTrade, type SeasonLine, type TradeAssetView, type TradeSideView } from '@/api/hub'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import { EmptyState } from './shared'
-import { fmtSigned } from '@/lib/formatters'
+import { fmtKtc, fmtSigned } from '@/lib/formatters'
+import { AssetKtc, BalanceBar } from './tradeKtc'
 
 function AssetRow({ a }: { a: TradeAssetView }) {
   const valued = a.type === 'player' || (a.type === 'pick' && a.resolutionStatus === 'resolved')
@@ -25,6 +26,7 @@ function AssetRow({ a }: { a: TradeAssetView }) {
             {a.weeksStarted} start{a.weeksStarted === 1 ? '' : 's'} · {a.weeksRostered} wk rostered
           </div>
         )}
+        <AssetKtc ktc={a.ktc} />
       </div>
       {valued && (
         <div className="text-right shrink-0">
@@ -85,6 +87,19 @@ function Side({
         Received {side.totals.assetsReceived} · {side.totals.assetsStillRostered} still rostered · PAR{' '}
         {fmtSigned(side.totals.par)}
       </div>
+      {side.totals.ktcAtTrade != null && (
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2 mb-3 py-2 border-y border-borderLow/60">
+          <span className="text-label text-muted uppercase tracking-[0.05em] font-semibold">
+            KTC value
+          </span>
+          <span className="font-mono text-small tabular text-text">
+            {fmtKtc(side.totals.ktcAtTrade)} at trade
+            {side.totals.ktcNow != null && (
+              <span className="text-mutedLow"> · {fmtKtc(side.totals.ktcNow)} now</span>
+            )}
+          </span>
+        </div>
+      )}
       {side.totals.playoffStarted > 0 && (
         <div className="text-small text-mutedLow mb-3">
           {side.totals.regularStarted.toFixed(1)} regular season ·{' '}
@@ -163,6 +178,8 @@ export default function HubTradeDetail() {
           </p>
         )}
       </div>
+
+      <BalanceBar balance={trade.ktcBalance} sides={trade.sides} />
 
       <div className="grid gap-4 md:grid-cols-2">
         {trade.sides.map((s, i) => (

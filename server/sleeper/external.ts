@@ -9,40 +9,26 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { readCacheFile, writeCacheFile } from '../lib/jsonFile.js'
+import { fetchRankings } from '../ktc/client.js'
 
-const KTC_PAGE_URL = 'https://keeptradecut.com/dynasty-rankings'
-
-/** KTC embeds player data in the page HTML as `var playersArray = [...]`. */
+/**
+ * The draft board's KTC feed: superflex TEP values for QB/RB/WR/TE.
+ *
+ * The scrape itself lives in `server/ktc/client.ts` now — this is the shape the
+ * draft tool has always consumed. TEP is deliberate here (it matches the
+ * league's scoring); the trade tracker uses plain superflex instead, because
+ * KTC publishes no TEP *history* to pair a TEP "now" with.
+ */
 export async function fetchKtcHtmlRankings(): Promise<unknown> {
-  const res = await fetch(KTC_PAGE_URL, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml',
-    },
-  })
-  if (!res.ok) throw new Error(`KTC returned ${res.status}`)
-  const html = await res.text()
-  const idx = html.indexOf('var playersArray = [')
-  if (idx === -1) throw new Error('KTC: playersArray not found in page')
-  const end = html.indexOf('];', idx)
-  if (end === -1) throw new Error('KTC: playersArray end not found')
-  const raw = JSON.parse(
-    html.slice(idx + 'var playersArray = '.length, end + 1),
-  ) as Array<{
-    playerName: string
-    position: string
-    team: string
-    superflexValues?: { tep?: { rank?: number; value?: number } }
-  }>
-  return raw
+  const { assets } = await fetchRankings()
+  return assets
     .filter((p) => ['QB', 'RB', 'WR', 'TE'].includes(p.position))
     .map((p) => ({
       playerName: p.playerName,
       position: p.position,
-      team: p.team,
-      overallRank: p.superflexValues?.tep?.rank ?? null,
-      value: p.superflexValues?.tep?.value ?? null,
+      team: p.team ?? null,
+      overallRank: p.superflexValues.tep?.rank ?? null,
+      value: p.superflexValues.tep?.value ?? null,
     }))
     .filter((p) => p.overallRank != null)
 }
