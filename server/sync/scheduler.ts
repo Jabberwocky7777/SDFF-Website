@@ -16,6 +16,7 @@ import { ingestAll } from './ingest.js'
 import { resolveNflState } from './nflState.js'
 import { acquireSyncLock, releaseSyncLock, syncLockHolder } from './lock.js'
 import { kickBackfillQueue } from './trigger.js'
+import { runKtcDaily } from './ktc.js'
 import { log } from '../log.js'
 
 let lastRun = 0
@@ -65,6 +66,25 @@ export function triggerIncremental(): void {
   void runIncremental('manual')
 }
 
+/**
+ * Daily KeepTradeCut snapshot. Shares the sync lock so it never overlaps an
+ * ingest or a backfill, and simply skips the day if the lock is held — the
+ * values are a daily series, and tomorrow's run backfills whatever today
+ * missed.
+ */
+async function runKtcSnapshot(trigger: string): Promise<void> {
+  if (!acquireSyncLock(`ktc:${trigger}`)) {
+    log.info('ktc snapshot skip — lock held', { trigger, holder: syncLockHolder() })
+    return
+  }
+  try {
+    await runKtcDaily(getDb())
+  } finally {
+    releaseSyncLock()
+    kickBackfillQueue()
+  }
+}
+
 export function startScheduler(): void {
   const isDev = process.env.NODE_ENV !== 'production'
   if (process.env.SYNC_ENABLED === '0') {
@@ -83,6 +103,10 @@ export function startScheduler(): void {
 
   // Every 15 min on Thu(4), Sun(0), Mon(1) — game days.
   cron.schedule('*/15 * * * 0,1,4', () => void runIncremental('gameday'), { timezone: tz })
+
+  // KTC publishes one value per asset per day; 6:20am local is after their
+  // overnight recalculation and before the incremental run at :07 gets busy.
+  cron.schedule('20 6 * * *', () => void runKtcSnapshot('daily'), { timezone: tz })
 
   // Warm start shortly after boot.
   setTimeout(() => void runIncremental('startup'), 20_000)

@@ -10,9 +10,13 @@
  *
  * Rules, in order:
  *   1. a hand-maintained override wins outright;
- *   2. otherwise normalized name + position must identify exactly one Sleeper
- *      player;
- *   3. if several share that key, the team breaks the tie;
+ *   2. normalized full name + an eligible position must identify exactly one
+ *      Sleeper player — "eligible" meaning any of `fantasy_positions`, not just
+ *      the headline one, because Sleeper lists Travis Hunter as a `DB` who is
+ *      also a WR (the same reason migration 007 exists);
+ *   3. failing that, normalized **last** name + eligible position + team, which
+ *      is what bridges the first-name variants the two sites disagree on —
+ *      Chig/Chigoziem Okonkwo, Gabe/Gabriel Davis, Kenny/Kenneth Gainwell;
  *   4. anything still ambiguous is left unmatched and reported. A guess here
  *      would silently attach another player's value to a trade.
  *
@@ -29,6 +33,8 @@ export interface SleeperPlayerRow {
   full_name: string | null
   position: string | null
   team: string | null
+  /** Raw JSON array from Sleeper, e.g. '["DB","WR"]'. */
+  fantasy_positions_json?: string | null
 }
 
 export interface AmbiguousMatch {
@@ -45,12 +51,61 @@ export interface MatchReport {
   overridden: Set<number>
   /** Player-position assets with no Sleeper counterpart. */
   unmatched: KtcRankingsAsset[]
-  /** Several Sleeper players fit and the team did not separate them. */
+  /** Several Sleeper players fit and neither team nor position separated them. */
   ambiguous: AmbiguousMatch[]
 }
 
-function key(name: string, position: string): string {
-  return `${normalizePlayerName(name)}|${position.toUpperCase()}`
+/**
+ * KTC's team codes are its own: `TBB` where Sleeper says `TB`, `NEP` for `NE`,
+ * and `FA` instead of no team at all. Without this the team tiebreaker silently
+ * failed for nine franchises — which is how Kenny Gainwell (TBB/TB) came out
+ * unmatched and Kyle Williams (NEP/NE) stayed ambiguous.
+ */
+const KTC_TEAM_ALIASES: Record<string, string> = {
+  GBP: 'GB',
+  JAC: 'JAX',
+  KCC: 'KC',
+  LVR: 'LV',
+  NEP: 'NE',
+  NOS: 'NO',
+  SFO: 'SF',
+  TBB: 'TB',
+}
+
+function sleeperTeam(ktcTeam: string | null | undefined): string | null {
+  if (!ktcTeam) return null
+  const code = ktcTeam.toUpperCase()
+  if (code === 'FA') return null
+  return KTC_TEAM_ALIASES[code] ?? code
+}
+
+/** Every position a Sleeper player can legally fill. */
+function eligiblePositions(p: SleeperPlayerRow): string[] {
+  const out = new Set<string>()
+  if (p.position) out.add(p.position.toUpperCase())
+  if (p.fantasy_positions_json) {
+    try {
+      const parsed: unknown = JSON.parse(p.fantasy_positions_json)
+      if (Array.isArray(parsed)) {
+        for (const v of parsed) if (typeof v === 'string') out.add(v.toUpperCase())
+      }
+    } catch {
+      // A malformed column is not worth failing a sync over; the headline
+      // position above still stands.
+    }
+  }
+  return [...out]
+}
+
+function lastName(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 1 ? parts[parts.length - 1] : name
+}
+
+function addTo(index: Map<string, SleeperPlayerRow[]>, key: string, row: SleeperPlayerRow): void {
+  const bucket = index.get(key)
+  if (bucket) bucket.push(row)
+  else index.set(key, [row])
 }
 
 export function matchKtcAssets(
@@ -58,16 +113,20 @@ export function matchKtcAssets(
   sleeperPlayers: readonly SleeperPlayerRow[],
   overrides: ReadonlyMap<string, number> = new Map(),
 ): MatchReport {
-  const byKey = new Map<string, SleeperPlayerRow[]>()
+  const byFullName = new Map<string, SleeperPlayerRow[]>()
+  const byLastNameTeam = new Map<string, SleeperPlayerRow[]>()
   for (const p of sleeperPlayers) {
-    if (!p.full_name || !p.position) continue
-    const k = key(p.full_name, p.position)
-    const bucket = byKey.get(k)
-    if (bucket) bucket.push(p)
-    else byKey.set(k, [p])
+    if (!p.full_name) continue
+    const full = normalizePlayerName(p.full_name)
+    const last = normalizePlayerName(lastName(p.full_name))
+    const team = p.team?.toUpperCase()
+    for (const pos of eligiblePositions(p)) {
+      addTo(byFullName, `${full}|${pos}`, p)
+      if (team) addTo(byLastNameTeam, `${last}|${pos}|${team}`, p)
+    }
   }
 
-  // player_id → ktc_id inverted to ktc_id → player_id.
+  // Overrides are stored player_id → ktc_id; invert for lookup by KTC id.
   const forcedByKtcId = new Map<number, string>()
   for (const [playerId, ktcId] of overrides) forcedByKtcId.set(ktcId, playerId)
 
@@ -90,27 +149,45 @@ export function matchKtcAssets(
     // season/round/tier instead, in server/analytics/ktc.ts.
     if (parsePickName(asset.playerName) !== null) continue
 
-    const candidates = byKey.get(key(asset.playerName, asset.position)) ?? []
-    if (candidates.length === 1) {
-      report.byKtcId.set(asset.playerID, candidates[0].player_id)
+    const pos = asset.position.toUpperCase()
+    const team = sleeperTeam(asset.team)
+
+    const byName = byFullName.get(`${normalizePlayerName(asset.playerName)}|${pos}`) ?? []
+    if (byName.length === 1) {
+      report.byKtcId.set(asset.playerID, byName[0].player_id)
       continue
     }
-    if (candidates.length === 0) {
-      report.unmatched.push(asset)
+    if (byName.length > 1) {
+      const onTeam = team ? byName.filter((c) => c.team?.toUpperCase() === team) : []
+      if (onTeam.length === 1) {
+        report.byKtcId.set(asset.playerID, onTeam[0].player_id)
+      } else {
+        report.ambiguous.push({
+          ktcId: asset.playerID,
+          name: asset.playerName,
+          position: asset.position,
+          candidates: byName.map((c) => c.player_id),
+        })
+      }
       continue
     }
 
-    const team = asset.team?.toUpperCase() ?? null
-    const onTeam = team ? candidates.filter((c) => c.team?.toUpperCase() === team) : []
-    if (onTeam.length === 1) {
-      report.byKtcId.set(asset.playerID, onTeam[0].player_id)
-    } else {
+    // Nothing on the full name: try the surname, pinned to a team so this
+    // cannot wander between two players who merely share one.
+    const byLast = team
+      ? byLastNameTeam.get(`${normalizePlayerName(lastName(asset.playerName))}|${pos}|${team}`) ?? []
+      : []
+    if (byLast.length === 1) {
+      report.byKtcId.set(asset.playerID, byLast[0].player_id)
+    } else if (byLast.length > 1) {
       report.ambiguous.push({
         ktcId: asset.playerID,
         name: asset.playerName,
         position: asset.position,
-        candidates: candidates.map((c) => c.player_id),
+        candidates: byLast.map((c) => c.player_id),
       })
+    } else {
+      report.unmatched.push(asset)
     }
   }
 

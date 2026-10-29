@@ -14,7 +14,9 @@ import type { KtcPoint, KtcRankingsAsset } from './schemas.js'
 
 export function readSleeperPlayers(db: DB): SleeperPlayerRow[] {
   return db
-    .prepare(`SELECT player_id, full_name, position, team FROM player`)
+    .prepare(
+      `SELECT player_id, full_name, position, team, fantasy_positions_json FROM player`,
+    )
     .all() as SleeperPlayerRow[]
 }
 
