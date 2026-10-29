@@ -433,21 +433,10 @@ router.get('/live/fantasycalc-rankings', (_req, res) => {
   )
 })
 
-router.get('/live/ktc/rankings', (_req, res) => {
-  void serveCachedUrl(
-    res,
-    'ktc-superflex',
-    'https://api.keeptradecut.com/dynasty-rankings?format=1&count=500&type=1',
-    24 * 60 * 60,
-    {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SDFF-Website/1.0)',
-        Accept: 'application/json',
-      },
-      emptyOnError: true,
-    },
-  )
-})
+// `/live/ktc/rankings` used to proxy `api.keeptradecut.com`. There is no such
+// host — it has never resolved — and `emptyOnError: true` meant the route
+// answered with an empty list instead of saying so. `/live/ktc-rankings` below
+// is the real one.
 
 router.get('/live/ktc-rankings', (_req, res) => {
   const hit = readCache('ktc_rankings', 60 * 60)
